@@ -7,14 +7,18 @@ import { AssetCard } from '@/components/vault/AssetCard';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useAssets } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
+import { analyzeEvidences, extractTextFromFile } from '@/hooks/useAnalyzeEvidences';
 import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Vault() {
   const { currentProject, isLoading: isLoadingProject } = useProjectContext();
   const { data: assets = [], isLoading: isLoadingAssets } = useAssets(currentProject?.id);
   const uploadAssetMutation = useUploadAsset();
   const updateStatusMutation = useUpdateAssetStatus();
+  const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!currentProject) return;
@@ -23,7 +27,8 @@ export default function Vault() {
     
     for (const file of files) {
       try {
-        // Upload file to storage and create asset record
+        // Step 1: Upload file to storage and create asset record
+        setProcessingMessage(`Enviando ${file.name}...`);
         const asset = await uploadAssetMutation.mutateAsync({
           projectId: currentProject.id,
           file,
@@ -34,36 +39,77 @@ export default function Vault() {
           description: `${file.name} foi enviado com sucesso.`,
         });
 
-        // Simulate AI processing delay, then update to completed
-        setTimeout(async () => {
-          try {
+        // Step 2: Extract text from file
+        setProcessingMessage(`Extraindo texto de ${file.name}...`);
+        const textContent = await extractTextFromFile(file);
+
+        if (textContent) {
+          // Step 3: Analyze with AI
+          setProcessingMessage(`Analisando ${file.name} com IA...`);
+          
+          const result = await analyzeEvidences({
+            projectId: currentProject.id,
+            assetId: asset.id,
+            content: textContent,
+            sourceDescription: `Arquivo: ${file.name}`,
+          });
+
+          if (result.error) {
+            // Update asset status to error
+            await updateStatusMutation.mutateAsync({
+              assetId: asset.id,
+              status: 'error',
+              projectId: currentProject.id,
+            });
+
+            toast({
+              title: 'Erro na análise',
+              description: result.error,
+              variant: 'destructive',
+            });
+          } else {
+            // Step 4: Update asset status to completed
             await updateStatusMutation.mutateAsync({
               assetId: asset.id,
               status: 'completed',
               projectId: currentProject.id,
             });
 
+            // Invalidate evidences query to refresh Matriz
+            queryClient.invalidateQueries({ queryKey: ['evidences', currentProject.id] });
+
             toast({
-              title: 'Arquivo processado',
-              description: `${file.name} foi analisado pela IA com sucesso.`,
+              title: 'IA processou o arquivo',
+              description: `${result.count} evidências extraídas de ${file.name}.`,
             });
-          } catch (error) {
-            console.error('Error updating asset status:', error);
           }
-        }, 3000);
+        } else {
+          // File type not supported for text extraction
+          await updateStatusMutation.mutateAsync({
+            assetId: asset.id,
+            status: 'completed',
+            projectId: currentProject.id,
+          });
+
+          toast({
+            title: 'Arquivo processado',
+            description: `${file.name} foi salvo (tipo não suportado para extração de texto).`,
+          });
+        }
 
       } catch (error) {
         console.error('Upload error:', error);
         toast({
           title: 'Erro no upload',
-          description: `Não foi possível enviar ${file.name}.`,
+          description: `Não foi possível processar ${file.name}.`,
           variant: 'destructive',
         });
       }
     }
     
     setIsUploading(false);
-  }, [currentProject, uploadAssetMutation, updateStatusMutation]);
+    setProcessingMessage(null);
+  }, [currentProject, uploadAssetMutation, updateStatusMutation, queryClient]);
 
   const isLoading = isLoadingProject || isLoadingAssets;
 
@@ -108,6 +154,20 @@ export default function Vault() {
           onFilesSelected={handleFilesSelected}
           isUploading={isUploading}
         />
+
+        {/* Processing Message */}
+        {processingMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-foreground">{processingMessage}</span>
+            </div>
+          </motion.div>
+        )}
 
         {/* Assets List */}
         <motion.section
