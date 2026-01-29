@@ -1,96 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Vendas2B Intelligence Design System - Apple Design Language with OKLCH */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Border Radius - Apple style 16px */
+    --radius: 1rem;
+    
+    /* Background & Foreground */
+    --background: 98.5% 0 0;
+    --foreground: 14.5% 0 0;
+    
+    /* Card */
+    --card: 100% 0 0;
+    --card-foreground: 14.5% 0 0;
+    
+    /* Popover */
+    --popover: 100% 0 0;
+    --popover-foreground: 14.5% 0 0;
+    
+    /* Primary - Teal/Verde Vendas2B */
+    --primary: 55% 0.15 165;
+    --primary-foreground: 98% 0.02 165;
+    
+    /* Secondary */
+    --secondary: 96% 0.01 165;
+    --secondary-foreground: 30% 0.08 165;
+    
+    /* Muted */
+    --muted: 97% 0 0;
+    --muted-foreground: 45% 0 0;
+    
+    /* Accent */
+    --accent: 95% 0.02 165;
+    --accent-foreground: 30% 0.1 165;
+    
+    /* Destructive */
+    --destructive: 55% 0.2 25;
+    --destructive-foreground: 98% 0 0;
+    
+    /* Warning - Para status "Investigar" */
+    --warning: 75% 0.15 85;
+    --warning-foreground: 25% 0.1 85;
+    
+    /* Success - Para status "Validado" */
+    --success: 65% 0.18 145;
+    --success-foreground: 98% 0 0;
+    
+    /* Border & Input */
+    --border: 92.2% 0 0;
+    --input: 92.2% 0 0;
+    --ring: 55% 0.15 165;
+    
+    /* Sidebar - Glassmorphism */
+    --sidebar-background: 98% 0 0;
+    --sidebar-foreground: 26.1% 0.01 0;
+    --sidebar-primary: 55% 0.15 165;
+    --sidebar-primary-foreground: 98% 0 0;
+    --sidebar-accent: 95.9% 0.01 0;
+    --sidebar-accent-foreground: 10% 0.01 0;
+    --sidebar-border: 91% 0.01 0;
+    --sidebar-ring: 55% 0.15 165;
+    
+    /* Pilares - Cores distintas */
+    --pilar-pessoas: 60% 0.15 340;
+    --pilar-processos: 60% 0.15 250;
+    --pilar-dados: 60% 0.15 165;
+    --pilar-tecnologia: 60% 0.15 290;
+    --pilar-gestao: 60% 0.15 45;
   }
 }
 
@@ -101,5 +82,66 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Apple-style smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  /* Apple-style active state for interactive elements */
+  .active-scale {
+    @apply transition-transform duration-150 active:scale-[0.98];
+  }
+  
+  /* Glassmorphism effect */
+  .glass {
+    background-color: oklch(var(--background) / 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid oklch(var(--border) / 0.5);
+  }
+  
+  /* Soft shadows - Apple style */
+  .shadow-soft {
+    box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.06),
+                0 4px 20px -4px rgba(0, 0, 0, 0.08);
+  }
+  
+  .shadow-soft-lg {
+    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08),
+                0 8px 40px -8px rgba(0, 0, 0, 0.12);
+  }
+  
+  /* Pilar badge backgrounds */
+  .bg-pilar-pessoas {
+    background-color: oklch(var(--pilar-pessoas) / 0.15);
+    color: oklch(var(--pilar-pessoas));
+  }
+  
+  .bg-pilar-processos {
+    background-color: oklch(var(--pilar-processos) / 0.15);
+    color: oklch(var(--pilar-processos));
+  }
+  
+  .bg-pilar-dados {
+    background-color: oklch(var(--pilar-dados) / 0.15);
+    color: oklch(var(--pilar-dados));
+  }
+  
+  .bg-pilar-tecnologia {
+    background-color: oklch(var(--pilar-tecnologia) / 0.15);
+    color: oklch(var(--pilar-tecnologia));
+  }
+  
+  .bg-pilar-gestao {
+    background-color: oklch(var(--pilar-gestao) / 0.15);
+    color: oklch(var(--pilar-gestao));
   }
 }

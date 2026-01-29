@@ -1,0 +1,85 @@
+// Type definitions for Vendas2B Intelligence
+
+export type Pilar = 'pessoas' | 'processos' | 'dados' | 'tecnologia' | 'gestao';
+
+export type EvidenceStatus = 'pendente' | 'validado' | 'rejeitado' | 'investigar';
+
+export type AssetStatus = 'uploading' | 'processing' | 'completed' | 'error';
+
+export interface Project {
+  id: string;
+  name: string;
+  client_name: string;
+  description?: string;
+  start_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Asset {
+  id: string;
+  project_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_path: string;
+  status: AssetStatus;
+  duration_seconds?: number;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Evidence {
+  id: string;
+  project_id: string;
+  asset_id?: string;
+  pilar: Pilar;
+  content: string;
+  source_description?: string;
+  timecode_start?: number;
+  timecode_end?: number;
+  status: EvidenceStatus;
+  is_divergence: boolean;
+  divergence_description?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Pilar configuration
+export const PILARES: Record<Pilar, { label: string; icon: string; description: string }> = {
+  pessoas: {
+    label: 'Pessoas',
+    icon: '👥',
+    description: 'DISC, Skills, Motivação, Liderança',
+  },
+  processos: {
+    label: 'Processos',
+    icon: '⚙️',
+    description: 'Fluxo, Cadência, Gargalos',
+  },
+  dados: {
+    label: 'Dados',
+    icon: '📊',
+    description: 'KPIs, Metas, Conversão',
+  },
+  tecnologia: {
+    label: 'Tecnologia',
+    icon: '💻',
+    description: 'CRM, Stack, Automação',
+  },
+  gestao: {
+    label: 'Gestão & Cultura',
+    icon: '🏛️',
+    description: 'Rituais, Crenças, Alinhamento',
+  },
+};
+
+// Status configuration
+export const STATUS_CONFIG: Record<EvidenceStatus, { label: string; color: string }> = {
+  pendente: { label: 'Pendente', color: 'bg-muted text-muted-foreground' },
+  validado: { label: 'Validado', color: 'bg-success/15 text-success' },
+  rejeitado: { label: 'Rejeitado', color: 'bg-destructive/15 text-destructive' },
+  investigar: { label: 'Investigar', color: 'bg-warning/15 text-warning' },
+};
