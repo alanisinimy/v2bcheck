@@ -1,114 +1,173 @@
 
 
-# Vendas2B Intelligence - MVP
+# Gestao de Projetos - Frontend State & UI
 
-Uma ferramenta de "Cofre de Inteligência" para consultores de vendas que segue a filosofia **"AI as Auditor, Human as Judge"** - onde a IA levanta evidências e o consultor valida.
-
----
-
-## Design System
-
-Interface premium seguindo **Apple Design Language**:
-- **Fonte**: Geist (Sans-serif)
-- **Cores**: OKLCH com Teal/Verde como cor primária
-- **Estilo**: Bordas arredondadas (16px), sombras difusas, Glassmorphism
-- **Micro-interações**: Elementos clicáveis com `active:scale-[0.98]`
+Implementacao do sistema de gerenciamento de projetos com Context API, localStorage para persistencia, e componentes de UI para troca e criacao de projetos.
 
 ---
 
-## Estrutura de Navegação
+## 1. Project Context (Estado Global)
 
-**Sidebar com Glassmorphism** contendo:
-- Dashboard (Visão Geral)
-- Vault (Ingestão de Dados)
-- Matriz de Diagnóstico
+Criar `src/contexts/ProjectContext.tsx`:
 
----
+**Estado gerenciado:**
+- `currentProject: Project | null` - Projeto ativo
+- `projects: Project[]` - Lista de todos os projetos
+- `isLoading: boolean` - Estado de carregamento
 
-## Tela 1: Dashboard
+**Funcoes expostas:**
+- `setCurrentProject(project: Project)` - Troca o projeto ativo
+- `addProject(project: Project)` - Adiciona novo projeto a lista e o seleciona
+- `clearCurrentProject()` - Limpa selecao
 
-Visão macro do diagnóstico em um relance:
+**Persistencia (localStorage):**
+- Salvar `lastProjectId` no localStorage ao trocar projeto
+- Ao inicializar, recuperar o ID salvo e selecionar automaticamente
+- Isso garante que F5 mantem o usuario no mesmo projeto
 
-- **Header**: Nome do projeto/cliente e data de início
-- **5 Metric Cards grandes** (um para cada pilar):
-  - 👥 Pessoas (DISC, Skills, Motivação)
-  - ⚙️ Processos (Fluxo, Cadência, Gargalos)
-  - 📊 Dados (KPIs, Metas, Conversão)
-  - 💻 Tecnologia (CRM, Stack, Automação)
-  - 🏛️ Gestão & Cultura (Rituais, Crenças)
-- **Contador de Divergências**: Alertas de conflitos entre fontes
-- **Estatísticas**: Total de evidências, validadas, pendentes
-
----
-
-## Tela 2: The Vault (Upload)
-
-Central minimalista de ingestão de dados:
-
-- **Área de Drag & Drop** para MP3, MP4, PDF, CSV
-- **Lista de Assets** com status:
-  - 🔄 Processando (com skeleton loading)
-  - ✅ Concluído
-  - ❌ Erro
-- **Preview de arquivos** com metadados
-- **Simulação de IA** extraindo evidências (delay + feedback visual)
+**Hook customizado:**
+- `useProject()` - Retorna todo o contexto para uso nos componentes
 
 ---
 
-## Tela 3: Matriz de Diagnóstico
+## 2. Project Switcher (Dropdown na Sidebar)
 
-Mesa de trabalho do consultor - onde evidências viram insights:
+Criar `src/components/layout/ProjectSwitcher.tsx`:
 
-**Layout**: Grid de Cards (estilo Masonry/Pinterest)
+**Visual (Apple/Geist style):**
+- Botao com nome do projeto atual + icone ChevronDown
+- Fundo sutil com hover state
+- Bordas arredondadas (rounded-xl)
 
-**Anatomia do Card de Evidência**:
-- **Header**: Ícone + Badge do Pilar (bg transparente `bg-primary/15`)
-- **Corpo**: Texto da evidência resumida
-- **Fonte**: Link para asset original (minuto exato quando aplicável)
-- **Footer com Ações**:
-  - ✅ **Validar** - Confirma como fato real (card fica verde)
-  - ❌ **Rejeitar** - Marca como ruído/erro (card some suavemente)
-  - 🚩 **Investigar** - Para aprofundamento (borda amarela)
+**Dropdown (DropdownMenu do Shadcn):**
+- Lista de projetos disponiveis
+- Projeto atual marcado com checkmark
+- Separador visual
+- Botao "+ Novo Projeto" com icone Plus e cor primary
 
-**Filtros**: Por pilar, status (Pendente/Validado/Rejeitado), e tipo de divergência
-
----
-
-## Backend (Lovable Cloud)
-
-**Banco de Dados com 3 tabelas principais**:
-
-1. **projects**: Clientes/empresas em diagnóstico
-2. **assets**: Arquivos brutos (referência para Storage)
-3. **evidences**: Unidades de informação extraídas
-   - Vinculadas ao asset de origem
-   - Tagueadas por pilar
-   - Status de validação
-   - Timecode (quando aplicável)
-
-**Storage**: Bucket para armazenar arquivos de áudio, vídeo e documentos
+**Integracao:**
+- Adicionar no topo da Sidebar (AppSidebar.tsx)
+- Abaixo do logo V2 / Vendas2B
 
 ---
 
-## Dados Mockados Incluídos
+## 3. Modal de Criacao de Projeto
 
-Cenários realistas de vendas B2B:
+Criar `src/components/project/CreateProjectDialog.tsx`:
 
-1. *"Gestor comercial alega uso de Salesforce, mas time relata uso de planilhas."* (Tecnologia | Divergência)
-2. *"Processo de qualificação não possui critério de BANT definido."* (Processos)
-3. *"Vendedor João possui perfil 'I' alto, com dificuldade em fechamento técnico."* (Pessoas)
-4. *"Meta de crescimento de 40% sem histórico de contratações planejadas."* (Dados | Divergência)
-5. *"Reunião de pipeline ocorre às segundas, mas 60% do time falta."* (Gestão & Cultura)
+**Estrutura do Dialog:**
+- Overlay com backdrop-blur (estetica Apple)
+- Titulo: "Novo Diagnostico"
+- Inputs com design limpo
+
+**Campos do formulario:**
+- Nome do Cliente/Empresa (obrigatorio)
+- Setor de Atuacao (opcional)
+- Data de inicio (pre-preenchida com hoje)
+
+**Logica ao criar:**
+1. Gerar ID unico (uuid ou timestamp)
+2. Adicionar projeto ao contexto via `addProject()`
+3. Selecionar automaticamente o novo projeto
+4. Fechar modal
+5. Mostrar toast de sucesso
 
 ---
 
-## Entregáveis
+## 4. Empty State (Primeiro Acesso)
 
-1. Design System completo com tokens OKLCH
-2. Sidebar navegável com Glassmorphism
-3. Dashboard com 5 Metric Cards interativos
-4. The Vault com upload funcional para Supabase Storage
-5. Matriz de Diagnóstico com cards de evidência e ações
-6. Backend completo com tabelas e RLS configurado
-7. Dados mockados para demonstração imediata
+Criar `src/components/layout/EmptyProjectState.tsx`:
+
+**Quando exibir:**
+- Quando `currentProject === null`
+- Primeira vez do usuario ou apos limpar localStorage
+
+**Design:**
+- Ilustracao ou icone grande centralizado
+- Titulo: "Bem-vindo ao Vendas2B Intelligence"
+- Subtitulo: "Crie seu primeiro projeto para comecar"
+- Botao CTA: "Criar Primeiro Projeto"
+
+**Comportamento:**
+- Clicar no botao abre o CreateProjectDialog
+
+---
+
+## 5. Refatoracao das Telas
+
+**Dashboard.tsx:**
+- Envolver com verificacao de `currentProject`
+- Se null, renderiza EmptyProjectState
+- Substituir `DEMO_PROJECT_ID` por `currentProject.id`
+- Usar dados do projeto atual no header
+
+**Vault.tsx:**
+- Mesma logica de verificacao
+- Assets filtrados por `currentProject.id`
+
+**Matriz.tsx:**
+- Mesma logica de verificacao
+- Evidencias filtradas por `currentProject.id`
+
+**App.tsx:**
+- Envolver toda aplicacao com `<ProjectProvider>`
+
+---
+
+## 6. Dados Mock Iniciais
+
+Para demonstracao, pre-popular com 2 projetos mock:
+
+1. **TechCorp Brasil** - Diagnostico Comercial (projeto atual do demo)
+2. **StartupXYZ** - Auditoria de Vendas
+
+Isso permite testar a troca de projetos imediatamente.
+
+---
+
+## Arquivos a Criar/Modificar
+
+| Arquivo | Acao |
+|---------|------|
+| `src/contexts/ProjectContext.tsx` | Criar |
+| `src/components/layout/ProjectSwitcher.tsx` | Criar |
+| `src/components/project/CreateProjectDialog.tsx` | Criar |
+| `src/components/layout/EmptyProjectState.tsx` | Criar |
+| `src/components/layout/AppSidebar.tsx` | Modificar (adicionar ProjectSwitcher) |
+| `src/App.tsx` | Modificar (adicionar ProjectProvider) |
+| `src/pages/Dashboard.tsx` | Modificar (consumir contexto) |
+| `src/pages/Vault.tsx` | Modificar (consumir contexto) |
+| `src/pages/Matriz.tsx` | Modificar (consumir contexto) |
+
+---
+
+## Secao Tecnica
+
+**Tipagem TypeScript:**
+```text
+interface ProjectContextType {
+  currentProject: Project | null;
+  projects: Project[];
+  isLoading: boolean;
+  setCurrentProject: (project: Project) => void;
+  addProject: (data: CreateProjectData) => void;
+  clearCurrentProject: () => void;
+}
+
+interface CreateProjectData {
+  name: string;
+  client_name: string;
+  description?: string;
+}
+```
+
+**localStorage keys:**
+- `vendas2b_last_project_id` - ID do ultimo projeto selecionado
+- `vendas2b_projects` - Lista de projetos (temporario ate integracao backend)
+
+**Fluxo de inicializacao:**
+1. Carregar projetos do localStorage (ou usar mocks se vazio)
+2. Verificar se existe `lastProjectId` salvo
+3. Se existir, selecionar projeto correspondente
+4. Se nao existir, manter `currentProject = null`
 
