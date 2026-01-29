@@ -10,12 +10,15 @@ interface FileUploadZoneProps {
 }
 
 const acceptedFileTypes = {
+  'text/plain': ['.txt'],
+  'text/markdown': ['.md'],
+  'text/csv': ['.csv'],
   'audio/mpeg': ['.mp3'],
   'audio/wav': ['.wav'],
+  'audio/x-m4a': ['.m4a'],
   'video/mp4': ['.mp4'],
   'video/webm': ['.webm'],
   'application/pdf': ['.pdf'],
-  'text/csv': ['.csv'],
   'application/vnd.ms-excel': ['.xls'],
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
 };
@@ -87,7 +90,7 @@ export function FileUploadZone({ onFilesSelected, isUploading }: FileUploadZoneP
                   Arraste arquivos ou clique para selecionar
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Suportamos MP3, MP4, PDF, CSV e Excel
+                  Suportamos TXT, MD, CSV, MP3, PDF e Excel
                 </p>
               </div>
               
