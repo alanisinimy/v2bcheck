@@ -1,20 +1,19 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { EvidenceCard } from '@/components/matriz/EvidenceCard';
 import { FilterBar } from '@/components/matriz/FilterBar';
-import { useEvidences, useUpdateEvidenceStatus } from '@/hooks/useProject';
+import { useProjectContext } from '@/contexts/ProjectContext';
+import { useEvidences } from '@/hooks/useProject';
 import type { Evidence, Pilar, EvidenceStatus } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 
-// Demo project ID
-const DEMO_PROJECT_ID = 'demo-project';
-
-// Mock evidences for demo
-const MOCK_EVIDENCES: Evidence[] = [
+// Mock evidences generator based on project
+const getMockEvidences = (projectId: string): Evidence[] => [
   {
     id: '1',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'tecnologia',
     content: 'Gestor comercial alega uso de Salesforce, mas time relata uso de planilhas para gestão do pipeline.',
     source_description: 'Reunião de Kick-off',
@@ -27,7 +26,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '2',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'processos',
     content: 'Processo de qualificação não possui critério de BANT definido. Leads entram no pipeline sem validação de budget ou timeline.',
     source_description: 'Entrevista Equipe Comercial',
@@ -39,7 +38,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '3',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'pessoas',
     content: 'Vendedor João possui perfil "I" alto no DISC, com dificuldade em fechamento técnico. Recomenda-se pairing com vendedor de perfil "D".',
     source_description: 'Análise DISC',
@@ -50,7 +49,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '4',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'dados',
     content: 'Meta de crescimento de 40% YoY sem histórico de contratações planejadas ou aumento de budget de marketing.',
     source_description: 'Reunião de Kick-off',
@@ -63,7 +62,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '5',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'gestao',
     content: 'Reunião de pipeline ocorre às segundas-feiras às 9h, mas 60% do time comercial falta regularmente.',
     source_description: 'Entrevista Equipe Comercial',
@@ -76,7 +75,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '6',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'processos',
     content: 'Cadência de follow-up não é padronizada. Cada vendedor segue sua própria metodologia.',
     source_description: 'Entrevista Equipe Comercial',
@@ -88,7 +87,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '7',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'tecnologia',
     content: 'Sistema de telefonia VoIP não está integrado ao CRM. Chamadas não são logadas automaticamente.',
     source_description: 'Processos Comerciais - Documentação',
@@ -99,7 +98,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '8',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'pessoas',
     content: 'Equipe não recebeu treinamento formal de vendas nos últimos 12 meses. Onboarding consiste em "shadowing" informal.',
     source_description: 'Entrevista Equipe Comercial',
@@ -111,7 +110,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '9',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'dados',
     content: 'Taxa de conversão de MQL para SQL é de 12%, abaixo do benchmark de 25% para o segmento.',
     source_description: 'Pipeline Q4 2023',
@@ -122,7 +121,7 @@ const MOCK_EVIDENCES: Evidence[] = [
   },
   {
     id: '10',
-    project_id: DEMO_PROJECT_ID,
+    project_id: projectId,
     pilar: 'gestao',
     content: 'Cultura de "vendedor herói" prevalece. Não há playbook documentado de melhores práticas.',
     source_description: 'Reunião de Kick-off',
@@ -135,10 +134,13 @@ const MOCK_EVIDENCES: Evidence[] = [
 ];
 
 export default function Matriz() {
-  const { data: dbEvidences } = useEvidences(DEMO_PROJECT_ID);
-  const updateStatus = useUpdateEvidenceStatus();
+  const { currentProject, isLoading } = useProjectContext();
+  const { data: dbEvidences } = useEvidences(currentProject?.id || '');
   
-  const [localEvidences, setLocalEvidences] = useState<Evidence[]>(MOCK_EVIDENCES);
+  // Get mock evidences for current project
+  const mockEvidences = currentProject ? getMockEvidences(currentProject.id) : [];
+  const [localEvidences, setLocalEvidences] = useState<Evidence[]>(mockEvidences);
+  
   const [selectedPilar, setSelectedPilar] = useState<Pilar | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<EvidenceStatus | 'all'>('all');
   const [showDivergences, setShowDivergences] = useState(false);
@@ -173,6 +175,26 @@ export default function Matriz() {
       description: `Evidência ${statusLabels[status]}.`,
     });
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Show empty state if no project selected
+  if (!currentProject) {
+    return (
+      <AppLayout>
+        <EmptyProjectState />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

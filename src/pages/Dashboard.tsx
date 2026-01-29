@@ -1,27 +1,19 @@
 import { motion } from 'framer-motion';
 import { Calendar, FileText, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { useProject, useProjectStats, useEvidences } from '@/hooks/useProject';
+import { useProjectContext } from '@/contexts/ProjectContext';
+import { useEvidences } from '@/hooks/useProject';
 import type { Pilar } from '@/lib/types';
 import { PILARES } from '@/lib/types';
 
-// Demo project ID - in real app would come from route/context
-const DEMO_PROJECT_ID = 'demo-project';
-
 export default function Dashboard() {
-  const { data: project } = useProject(DEMO_PROJECT_ID);
-  const { data: evidences } = useEvidences(DEMO_PROJECT_ID);
-  const stats = useProjectStats(DEMO_PROJECT_ID);
+  const { currentProject, isLoading } = useProjectContext();
+  const { data: evidences } = useEvidences(currentProject?.id || '');
 
-  // Use mock data for demo
-  const mockProject = {
-    name: 'Diagnóstico Comercial',
-    client_name: 'TechCorp Brasil',
-    start_date: '2024-01-15',
-  };
-
+  // Mock stats for demo
   const mockStats = {
     total: 24,
     byPilar: {
@@ -40,10 +32,27 @@ export default function Dashboard() {
     divergences: 3,
   };
 
-  const displayProject = project || mockProject;
-  const displayStats = evidences ? stats : mockStats;
-
   const pilares: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Show empty state if no project selected
+  if (!currentProject) {
+    return (
+      <AppLayout>
+        <EmptyProjectState />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -56,13 +65,13 @@ export default function Dashboard() {
           className="mb-8"
         >
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            {displayProject.client_name}
+            {currentProject.client_name}
           </h1>
           <div className="flex items-center gap-4 text-muted-foreground">
-            <span className="font-medium text-foreground">{displayProject.name}</span>
+            <span className="font-medium text-foreground">{currentProject.name}</span>
             <span className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
-              Início: {new Date(displayProject.start_date).toLocaleDateString('pt-BR')}
+              Início: {new Date(currentProject.start_date).toLocaleDateString('pt-BR')}
             </span>
           </div>
         </motion.header>
@@ -71,26 +80,26 @@ export default function Dashboard() {
         <div className="grid grid-cols-4 gap-4 mb-8">
           <StatsCard
             title="Total de Evidências"
-            value={displayStats.total}
+            value={mockStats.total}
             icon={FileText}
             index={0}
           />
           <StatsCard
             title="Validadas"
-            value={displayStats.byStatus?.validado || 0}
+            value={mockStats.byStatus?.validado || 0}
             icon={CheckCircle}
             variant="success"
             index={1}
           />
           <StatsCard
             title="Pendentes"
-            value={displayStats.byStatus?.pendente || 0}
+            value={mockStats.byStatus?.pendente || 0}
             icon={Clock}
             index={2}
           />
           <StatsCard
             title="Divergências"
-            value={displayStats.divergences}
+            value={mockStats.divergences}
             icon={AlertTriangle}
             variant="warning"
             index={3}
@@ -112,8 +121,8 @@ export default function Dashboard() {
             <MetricCard
               key={pilar}
               pilar={pilar}
-              count={displayStats.byPilar?.[pilar] || 0}
-              total={displayStats.total}
+              count={mockStats.byPilar?.[pilar] || 0}
+              total={mockStats.total}
               index={index}
             />
           ))}

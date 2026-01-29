@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ProjectSwitcher } from './ProjectSwitcher';
 
 const navItems = [
   {
@@ -54,6 +55,11 @@ export function AppSidebar() {
             )}
           </AnimatePresence>
         </div>
+      </div>
+
+      {/* Project Switcher */}
+      <div className="p-3 border-b border-border/50">
+        <ProjectSwitcher collapsed={collapsed} />
       </div>
 
       {/* Navigation */}
