@@ -1,173 +1,182 @@
 
 
-# Gestao de Projetos - Frontend State & UI
+# Implementação do Agente de Extração de Evidências com IA
 
-Implementacao do sistema de gerenciamento de projetos com Context API, localStorage para persistencia, e componentes de UI para troca e criacao de projetos.
-
----
-
-## 1. Project Context (Estado Global)
-
-Criar `src/contexts/ProjectContext.tsx`:
-
-**Estado gerenciado:**
-- `currentProject: Project | null` - Projeto ativo
-- `projects: Project[]` - Lista de todos os projetos
-- `isLoading: boolean` - Estado de carregamento
-
-**Funcoes expostas:**
-- `setCurrentProject(project: Project)` - Troca o projeto ativo
-- `addProject(project: Project)` - Adiciona novo projeto a lista e o seleciona
-- `clearCurrentProject()` - Limpa selecao
-
-**Persistencia (localStorage):**
-- Salvar `lastProjectId` no localStorage ao trocar projeto
-- Ao inicializar, recuperar o ID salvo e selecionar automaticamente
-- Isso garante que F5 mantem o usuario no mesmo projeto
-
-**Hook customizado:**
-- `useProject()` - Retorna todo o contexto para uso nos componentes
+Criação da Edge Function `analyze-evidences` que usa IA para extrair evidências estruturadas de textos e integração com o Vault para processamento automático de arquivos.
 
 ---
 
-## 2. Project Switcher (Dropdown na Sidebar)
+## Visão Geral da Arquitetura
 
-Criar `src/components/layout/ProjectSwitcher.tsx`:
-
-**Visual (Apple/Geist style):**
-- Botao com nome do projeto atual + icone ChevronDown
-- Fundo sutil com hover state
-- Bordas arredondadas (rounded-xl)
-
-**Dropdown (DropdownMenu do Shadcn):**
-- Lista de projetos disponiveis
-- Projeto atual marcado com checkmark
-- Separador visual
-- Botao "+ Novo Projeto" com icone Plus e cor primary
-
-**Integracao:**
-- Adicionar no topo da Sidebar (AppSidebar.tsx)
-- Abaixo do logo V2 / Vendas2B
+```text
+┌─────────────────┐      ┌──────────────────────┐      ┌─────────────────┐
+│   Vault.tsx     │ ──── │  analyze-evidences   │ ──── │  Lovable AI     │
+│   (Frontend)    │      │  (Edge Function)     │      │  Gateway        │
+└─────────────────┘      └──────────────────────┘      └─────────────────┘
+        │                         │
+        │                         │
+        ▼                         ▼
+┌─────────────────┐      ┌──────────────────────┐
+│  assets table   │      │  evidences table     │
+│  (status upd.)  │      │  (insert batch)      │
+└─────────────────┘      └──────────────────────┘
+```
 
 ---
 
-## 3. Modal de Criacao de Projeto
+## 1. Edge Function: analyze-evidences
 
-Criar `src/components/project/CreateProjectDialog.tsx`:
+Criar `supabase/functions/analyze-evidences/index.ts`:
 
-**Estrutura do Dialog:**
-- Overlay com backdrop-blur (estetica Apple)
-- Titulo: "Novo Diagnostico"
-- Inputs com design limpo
+**Configuração:**
+- Usar Lovable AI Gateway (já configurado com `LOVABLE_API_KEY`)
+- Modelo: `google/gemini-3-flash-preview` (rápido e eficiente para extração)
+- Temperature: 0.2 (respostas determinísticas)
+- Tool calling para garantir JSON estruturado
 
-**Campos do formulario:**
-- Nome do Cliente/Empresa (obrigatorio)
-- Setor de Atuacao (opcional)
-- Data de inicio (pre-preenchida com hoje)
+**System Prompt (O Cérebro do Auditor):**
+```text
+Você é um Auditor Sênior de Vendas B2B. Sua função é extrair evidências 
+factuais de textos para um diagnóstico comercial.
 
-**Logica ao criar:**
-1. Gerar ID unico (uuid ou timestamp)
-2. Adicionar projeto ao contexto via `addProject()`
-3. Selecionar automaticamente o novo projeto
-4. Fechar modal
-5. Mostrar toast de sucesso
+Analise o texto e extraia itens classificando-os em 5 Pilares:
+1. Pessoas (Perfil, Skills, Motivação)
+2. Processos (Fluxo, Gargalos, Cadência)
+3. Dados (KPIs, Metas, Conversão)
+4. Tecnologia (CRM, Ferramentas)
+5. Gestão & Cultura (Rituais, Crenças)
 
----
+REGRAS:
+- Seja factual e direto
+- Se houver contradição explícita, marque is_divergence=true
+- Classifique cada evidência corretamente no pilar apropriado
+```
 
-## 4. Empty State (Primeiro Acesso)
+**Schema de Resposta (via Tool Calling):**
+```text
+{
+  "evidences": [
+    {
+      "content": "Descrição clara do fato",
+      "pilar": "pessoas" | "processos" | "dados" | "tecnologia" | "gestao",
+      "is_divergence": boolean,
+      "divergence_description": "Explicação se for divergência"
+    }
+  ]
+}
+```
 
-Criar `src/components/layout/EmptyProjectState.tsx`:
-
-**Quando exibir:**
-- Quando `currentProject === null`
-- Primeira vez do usuario ou apos limpar localStorage
-
-**Design:**
-- Ilustracao ou icone grande centralizado
-- Titulo: "Bem-vindo ao Vendas2B Intelligence"
-- Subtitulo: "Crie seu primeiro projeto para comecar"
-- Botao CTA: "Criar Primeiro Projeto"
-
-**Comportamento:**
-- Clicar no botao abre o CreateProjectDialog
-
----
-
-## 5. Refatoracao das Telas
-
-**Dashboard.tsx:**
-- Envolver com verificacao de `currentProject`
-- Se null, renderiza EmptyProjectState
-- Substituir `DEMO_PROJECT_ID` por `currentProject.id`
-- Usar dados do projeto atual no header
-
-**Vault.tsx:**
-- Mesma logica de verificacao
-- Assets filtrados por `currentProject.id`
-
-**Matriz.tsx:**
-- Mesma logica de verificacao
-- Evidencias filtradas por `currentProject.id`
-
-**App.tsx:**
-- Envolver toda aplicacao com `<ProjectProvider>`
+**Tratamento de Erros:**
+- Validação de JSON inválido
+- Rate limiting (429) e payment required (402)
+- CORS headers completos
+- Logging detalhado para debug
 
 ---
 
-## 6. Dados Mock Iniciais
+## 2. Atualizar config.toml
 
-Para demonstracao, pre-popular com 2 projetos mock:
+Adicionar configuração da Edge Function:
 
-1. **TechCorp Brasil** - Diagnostico Comercial (projeto atual do demo)
-2. **StartupXYZ** - Auditoria de Vendas
+```toml
+[functions.analyze-evidences]
+verify_jwt = false
+```
 
-Isso permite testar a troca de projetos imediatamente.
+---
+
+## 3. Hook: useAnalyzeEvidences
+
+Criar `src/hooks/useAnalyzeEvidences.ts`:
+
+**Responsabilidades:**
+- Chamar `supabase.functions.invoke('analyze-evidences')`
+- Processar resposta e inserir evidências no banco em batch
+- Vincular ao `project_id` e `asset_id` atuais
+- Retornar contagem de evidências criadas
+
+**Interface:**
+```text
+useAnalyzeEvidences({
+  projectId: string,
+  assetId: string,
+  content: string,
+  sourceDescription: string
+}) => Promise<{ count: number }>
+```
+
+---
+
+## 4. Integração no Vault.tsx
+
+**Fluxo Atualizado de Upload:**
+
+1. Upload do arquivo para Storage ✓ (já existe)
+2. Criar registro na tabela assets ✓ (já existe)
+3. **NOVO:** Extrair texto do arquivo
+   - Arquivos `.txt`, `.csv`: ler conteúdo diretamente
+   - Arquivos de áudio/PDF: usar placeholder simulado (próxima iteração)
+4. **NOVO:** Chamar Edge Function `analyze-evidences`
+5. **NOVO:** Inserir evidências extraídas no banco
+6. Atualizar status do asset para `completed`
+7. Mostrar toast com contagem de evidências
+
+**UI Updates:**
+- Mostrar progresso: "Analisando com IA..."
+- Toast de sucesso: "IA extraiu X evidências do arquivo"
+- Se erro, status do asset vai para `error`
+
+---
+
+## 5. Helper: Extração de Texto
+
+Criar função `extractTextFromFile(file: File)`:
+
+**Suporte inicial:**
+- `.txt`: `file.text()`
+- `.csv`: `file.text()` (IA interpreta tabelas)
+- `.md`: `file.text()`
+
+**Placeholder para futuro:**
+- Áudio (`.mp3`, `.wav`): texto simulado de reunião
+- PDF: texto simulado de documento
+- Nota: Whisper e OCR serão implementados na próxima iteração
 
 ---
 
 ## Arquivos a Criar/Modificar
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---------|------|
-| `src/contexts/ProjectContext.tsx` | Criar |
-| `src/components/layout/ProjectSwitcher.tsx` | Criar |
-| `src/components/project/CreateProjectDialog.tsx` | Criar |
-| `src/components/layout/EmptyProjectState.tsx` | Criar |
-| `src/components/layout/AppSidebar.tsx` | Modificar (adicionar ProjectSwitcher) |
-| `src/App.tsx` | Modificar (adicionar ProjectProvider) |
-| `src/pages/Dashboard.tsx` | Modificar (consumir contexto) |
-| `src/pages/Vault.tsx` | Modificar (consumir contexto) |
-| `src/pages/Matriz.tsx` | Modificar (consumir contexto) |
+| `supabase/functions/analyze-evidences/index.ts` | Criar |
+| `supabase/config.toml` | Modificar |
+| `src/hooks/useAnalyzeEvidences.ts` | Criar |
+| `src/pages/Vault.tsx` | Modificar |
 
 ---
 
-## Secao Tecnica
+## Seção Técnica
 
-**Tipagem TypeScript:**
+**Mapeamento de Pilares (IA → DB):**
 ```text
-interface ProjectContextType {
-  currentProject: Project | null;
-  projects: Project[];
-  isLoading: boolean;
-  setCurrentProject: (project: Project) => void;
-  addProject: (data: CreateProjectData) => void;
-  clearCurrentProject: () => void;
-}
-
-interface CreateProjectData {
-  name: string;
-  client_name: string;
-  description?: string;
-}
+"Pessoas"           → "pessoas"
+"Processos"         → "processos"
+"Dados"             → "dados"
+"Tecnologia"        → "tecnologia"
+"Gestão & Cultura"  → "gestao"
 ```
 
-**localStorage keys:**
-- `vendas2b_last_project_id` - ID do ultimo projeto selecionado
-- `vendas2b_projects` - Lista de projetos (temporario ate integracao backend)
+**Rate Limiting:**
+- Edge Function lida com 429 e 402 do Lovable AI
+- Frontend mostra erro apropriado ao usuário
 
-**Fluxo de inicializacao:**
-1. Carregar projetos do localStorage (ou usar mocks se vazio)
-2. Verificar se existe `lastProjectId` salvo
-3. Se existir, selecionar projeto correspondente
-4. Se nao existir, manter `currentProject = null`
+**Vantagem de usar Lovable AI:**
+- `LOVABLE_API_KEY` já está configurado automaticamente
+- Não precisa de chave OpenAI adicional
+- Modelo `google/gemini-3-flash-preview` é rápido e preciso
+
+**Teste de Validação:**
+1. Fazer upload de arquivo `.txt` com conteúdo de reunião
+2. Verificar se evidências aparecem na Matriz
+3. Dar F5 e confirmar persistência
 
