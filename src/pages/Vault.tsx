@@ -6,70 +6,15 @@ import { FileUploadZone } from '@/components/vault/FileUploadZone';
 import { AssetCard } from '@/components/vault/AssetCard';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useAssets } from '@/hooks/useProject';
-import type { Asset } from '@/lib/types';
+import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
 import { toast } from '@/hooks/use-toast';
 
-// Mock assets generator based on project
-const getMockAssets = (projectId: string): Asset[] => [
-  {
-    id: '1',
-    project_id: projectId,
-    file_name: 'Reunião de Kick-off - TechCorp.mp3',
-    file_type: 'audio/mpeg',
-    file_size: 45678901,
-    storage_path: 'demo/kickoff.mp3',
-    status: 'completed',
-    duration_seconds: 3720,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    project_id: projectId,
-    file_name: 'Entrevista Equipe Comercial.mp4',
-    file_type: 'video/mp4',
-    file_size: 234567890,
-    storage_path: 'demo/entrevista.mp4',
-    status: 'completed',
-    duration_seconds: 5400,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    project_id: projectId,
-    file_name: 'Processos Comerciais - Documentação.pdf',
-    file_type: 'application/pdf',
-    file_size: 2345678,
-    storage_path: 'demo/processos.pdf',
-    status: 'completed',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    project_id: projectId,
-    file_name: 'Pipeline Q4 2023.csv',
-    file_type: 'text/csv',
-    file_size: 123456,
-    storage_path: 'demo/pipeline.csv',
-    status: 'processing',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
 export default function Vault() {
-  const { currentProject, isLoading } = useProjectContext();
-  const { data: dbAssets } = useAssets(currentProject?.id || '');
-  const [localAssets, setLocalAssets] = useState<Asset[]>([]);
+  const { currentProject, isLoading: isLoadingProject } = useProjectContext();
+  const { data: assets = [], isLoading: isLoadingAssets } = useAssets(currentProject?.id);
+  const uploadAssetMutation = useUploadAsset();
+  const updateStatusMutation = useUpdateAssetStatus();
   const [isUploading, setIsUploading] = useState(false);
-
-  // Get mock assets for current project
-  const mockAssets = currentProject ? getMockAssets(currentProject.id) : [];
-  
-  // Combine DB assets with mock assets for demo
-  const assets = dbAssets?.length ? dbAssets : [...mockAssets, ...localAssets];
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!currentProject) return;
@@ -77,45 +22,50 @@ export default function Vault() {
     setIsUploading(true);
     
     for (const file of files) {
-      // Create a temporary local asset for immediate feedback
-      const tempAsset: Asset = {
-        id: `temp-${Date.now()}-${file.name}`,
-        project_id: currentProject.id,
-        file_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        storage_path: '',
-        status: 'uploading',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      setLocalAssets(prev => [tempAsset, ...prev]);
+      try {
+        // Upload file to storage and create asset record
+        const asset = await uploadAssetMutation.mutateAsync({
+          projectId: currentProject.id,
+          file,
+        });
 
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Update to processing
-      setLocalAssets(prev => 
-        prev.map(a => a.id === tempAsset.id ? { ...a, status: 'processing' as const } : a)
-      );
+        toast({
+          title: 'Upload concluído',
+          description: `${file.name} foi enviado com sucesso.`,
+        });
 
-      // Simulate AI processing delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Update to completed
-      setLocalAssets(prev => 
-        prev.map(a => a.id === tempAsset.id ? { ...a, status: 'completed' as const } : a)
-      );
+        // Simulate AI processing delay, then update to completed
+        setTimeout(async () => {
+          try {
+            await updateStatusMutation.mutateAsync({
+              assetId: asset.id,
+              status: 'completed',
+              projectId: currentProject.id,
+            });
 
-      toast({
-        title: 'Arquivo processado',
-        description: `${file.name} foi analisado pela IA com sucesso.`,
-      });
+            toast({
+              title: 'Arquivo processado',
+              description: `${file.name} foi analisado pela IA com sucesso.`,
+            });
+          } catch (error) {
+            console.error('Error updating asset status:', error);
+          }
+        }, 3000);
+
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({
+          title: 'Erro no upload',
+          description: `Não foi possível enviar ${file.name}.`,
+          variant: 'destructive',
+        });
+      }
     }
     
     setIsUploading(false);
-  }, [currentProject]);
+  }, [currentProject, uploadAssetMutation, updateStatusMutation]);
+
+  const isLoading = isLoadingProject || isLoadingAssets;
 
   // Show loading state
   if (isLoading) {
