@@ -32,16 +32,15 @@ export function CreateProjectDialog({ trigger, open, onOpenChange }: CreateProje
   const isOpen = isControlled ? open : internalOpen;
   const setIsOpen = isControlled ? onOpenChange! : setInternalOpen;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!clientName.trim()) return;
 
     setIsSubmitting(true);
 
-    // Simulate a brief delay for better UX
-    setTimeout(() => {
-      addProject({
+    try {
+      await addProject({
         name: 'Diagnóstico Comercial',
         client_name: clientName.trim(),
         description: sector.trim() || undefined,
@@ -55,9 +54,16 @@ export function CreateProjectDialog({ trigger, open, onOpenChange }: CreateProje
       // Reset form
       setClientName('');
       setSector('');
-      setIsSubmitting(false);
       setIsOpen(false);
-    }, 300);
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar projeto',
+        description: 'Não foi possível criar o projeto. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const dialogContent = (

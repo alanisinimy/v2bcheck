@@ -1,152 +1,27 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { EvidenceCard } from '@/components/matriz/EvidenceCard';
 import { FilterBar } from '@/components/matriz/FilterBar';
+import { Button } from '@/components/ui/button';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useEvidences } from '@/hooks/useProject';
-import type { Evidence, Pilar, EvidenceStatus } from '@/lib/types';
+import { useEvidences, useUpdateEvidenceStatus } from '@/hooks/useProject';
+import { useCreateEvidence } from '@/hooks/useCreateEvidence';
+import type { Pilar, EvidenceStatus } from '@/lib/types';
+import { PILARES } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 
-// Mock evidences generator based on project
-const getMockEvidences = (projectId: string): Evidence[] => [
-  {
-    id: '1',
-    project_id: projectId,
-    pilar: 'tecnologia',
-    content: 'Gestor comercial alega uso de Salesforce, mas time relata uso de planilhas para gestão do pipeline.',
-    source_description: 'Reunião de Kick-off',
-    timecode_start: 845,
-    status: 'pendente',
-    is_divergence: true,
-    divergence_description: 'Conflito entre declaração do gestor e relato da equipe',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    project_id: projectId,
-    pilar: 'processos',
-    content: 'Processo de qualificação não possui critério de BANT definido. Leads entram no pipeline sem validação de budget ou timeline.',
-    source_description: 'Entrevista Equipe Comercial',
-    timecode_start: 1230,
-    status: 'pendente',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    project_id: projectId,
-    pilar: 'pessoas',
-    content: 'Vendedor João possui perfil "I" alto no DISC, com dificuldade em fechamento técnico. Recomenda-se pairing com vendedor de perfil "D".',
-    source_description: 'Análise DISC',
-    status: 'validado',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    project_id: projectId,
-    pilar: 'dados',
-    content: 'Meta de crescimento de 40% YoY sem histórico de contratações planejadas ou aumento de budget de marketing.',
-    source_description: 'Reunião de Kick-off',
-    timecode_start: 2100,
-    status: 'investigar',
-    is_divergence: true,
-    divergence_description: 'Meta agressiva sem plano de suporte estruturado',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    project_id: projectId,
-    pilar: 'gestao',
-    content: 'Reunião de pipeline ocorre às segundas-feiras às 9h, mas 60% do time comercial falta regularmente.',
-    source_description: 'Entrevista Equipe Comercial',
-    timecode_start: 3400,
-    status: 'pendente',
-    is_divergence: true,
-    divergence_description: 'Ritual existe na teoria mas não na prática',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '6',
-    project_id: projectId,
-    pilar: 'processos',
-    content: 'Cadência de follow-up não é padronizada. Cada vendedor segue sua própria metodologia.',
-    source_description: 'Entrevista Equipe Comercial',
-    timecode_start: 1800,
-    status: 'validado',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '7',
-    project_id: projectId,
-    pilar: 'tecnologia',
-    content: 'Sistema de telefonia VoIP não está integrado ao CRM. Chamadas não são logadas automaticamente.',
-    source_description: 'Processos Comerciais - Documentação',
-    status: 'pendente',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '8',
-    project_id: projectId,
-    pilar: 'pessoas',
-    content: 'Equipe não recebeu treinamento formal de vendas nos últimos 12 meses. Onboarding consiste em "shadowing" informal.',
-    source_description: 'Entrevista Equipe Comercial',
-    timecode_start: 4200,
-    status: 'pendente',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '9',
-    project_id: projectId,
-    pilar: 'dados',
-    content: 'Taxa de conversão de MQL para SQL é de 12%, abaixo do benchmark de 25% para o segmento.',
-    source_description: 'Pipeline Q4 2023',
-    status: 'validado',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: '10',
-    project_id: projectId,
-    pilar: 'gestao',
-    content: 'Cultura de "vendedor herói" prevalece. Não há playbook documentado de melhores práticas.',
-    source_description: 'Reunião de Kick-off',
-    timecode_start: 2800,
-    status: 'pendente',
-    is_divergence: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
 export default function Matriz() {
-  const { currentProject, isLoading } = useProjectContext();
-  const { data: dbEvidences } = useEvidences(currentProject?.id || '');
-  
-  // Get mock evidences for current project
-  const mockEvidences = currentProject ? getMockEvidences(currentProject.id) : [];
-  const [localEvidences, setLocalEvidences] = useState<Evidence[]>(mockEvidences);
+  const { currentProject, isLoading: isLoadingProject } = useProjectContext();
+  const { data: evidences = [], isLoading: isLoadingEvidences } = useEvidences(currentProject?.id);
+  const updateStatusMutation = useUpdateEvidenceStatus();
+  const createEvidenceMutation = useCreateEvidence();
   
   const [selectedPilar, setSelectedPilar] = useState<Pilar | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<EvidenceStatus | 'all'>('all');
   const [showDivergences, setShowDivergences] = useState(false);
-
-  // Use DB evidences if available, otherwise use local mock
-  const evidences = dbEvidences?.length ? dbEvidences : localEvidences;
 
   const filteredEvidences = useMemo(() => {
     return evidences.filter(ev => {
@@ -157,24 +32,61 @@ export default function Matriz() {
     });
   }, [evidences, selectedPilar, selectedStatus, showDivergences]);
 
-  const handleStatusChange = (evidenceId: string, status: EvidenceStatus) => {
-    // Update local state for demo
-    setLocalEvidences(prev =>
-      prev.map(ev => ev.id === evidenceId ? { ...ev, status } : ev)
-    );
+  const handleStatusChange = async (evidenceId: string, status: EvidenceStatus) => {
+    try {
+      await updateStatusMutation.mutateAsync({ evidenceId, status });
+      
+      const statusLabels = {
+        validado: 'validada',
+        rejeitado: 'rejeitada',
+        investigar: 'marcada para investigação',
+        pendente: 'marcada como pendente',
+      };
 
-    const statusLabels = {
-      validado: 'validada',
-      rejeitado: 'rejeitada',
-      investigar: 'marcada para investigação',
-      pendente: 'marcada como pendente',
-    };
-
-    toast({
-      title: 'Status atualizado',
-      description: `Evidência ${statusLabels[status]}.`,
-    });
+      toast({
+        title: 'Status atualizado',
+        description: `Evidência ${statusLabels[status]}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao atualizar',
+        description: 'Não foi possível atualizar o status da evidência.',
+        variant: 'destructive',
+      });
+    }
   };
+
+  // Temporary function to add test evidence
+  const handleAddTestEvidence = async () => {
+    if (!currentProject) return;
+
+    const pilares: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
+    const randomPilar = pilares[Math.floor(Math.random() * pilares.length)];
+    
+    try {
+      await createEvidenceMutation.mutateAsync({
+        project_id: currentProject.id,
+        pilar: randomPilar,
+        content: `Evidência de teste criada em ${new Date().toLocaleTimeString()}. Pilar: ${PILARES[randomPilar].label}`,
+        source_description: 'Teste Manual',
+        status: 'pendente',
+        is_divergence: Math.random() > 0.7,
+      });
+
+      toast({
+        title: 'Evidência criada',
+        description: `Nova evidência adicionada ao pilar ${PILARES[randomPilar].label}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao criar',
+        description: 'Não foi possível criar a evidência.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const isLoading = isLoadingProject || isLoadingEvidences;
 
   // Show loading state
   if (isLoading) {
@@ -206,10 +118,23 @@ export default function Matriz() {
           transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
           className="mb-6"
         >
-          <h1 className="text-3xl font-bold text-foreground mb-2">Matriz de Diagnóstico</h1>
-          <p className="text-muted-foreground">
-            Mesa de trabalho do consultor. Valide, rejeite ou investigue cada evidência.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Matriz de Diagnóstico</h1>
+              <p className="text-muted-foreground">
+                Mesa de trabalho do consultor. Valide, rejeite ou investigue cada evidência.
+              </p>
+            </div>
+            {/* Temporary test button */}
+            <Button
+              onClick={handleAddTestEvidence}
+              disabled={createEvidenceMutation.isPending}
+              className="gap-2 bg-primary hover:bg-primary/90"
+            >
+              <Plus className="w-4 h-4" />
+              {createEvidenceMutation.isPending ? 'Criando...' : 'Add Evidência (Teste)'}
+            </Button>
+          </div>
         </motion.header>
 
         {/* Filter Bar */}
@@ -252,7 +177,11 @@ export default function Matriz() {
             animate={{ opacity: 1 }}
             className="text-center py-12 text-muted-foreground"
           >
-            <p>Nenhuma evidência encontrada com os filtros atuais.</p>
+            <p>
+              {evidences.length === 0 
+                ? 'Nenhuma evidência ainda. Clique em "Add Evidência (Teste)" para criar uma.'
+                : 'Nenhuma evidência encontrada com os filtros atuais.'}
+            </p>
           </motion.div>
         )}
       </div>
