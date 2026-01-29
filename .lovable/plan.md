@@ -1,65 +1,92 @@
 
 
-# Corrigir Upload de Arquivos TXT no Storage
+# Correção da Edge Function para usar OpenAI diretamente
 
-O bucket de Storage `project-files` não aceita arquivos `.txt` porque `text/plain` não está na lista de MIME types permitidos.
+A Edge Function está usando o Lovable AI Gateway com modelo Gemini, mas o projeto tem a chave `OPENAI_API_KEY` configurada.
 
 ---
 
-## Problema Identificado
+## Problema Atual
 
-O bucket foi criado com uma lista restrita de MIME types:
 ```text
-audio/mpeg, audio/mp3, audio/wav
-video/mp4, video/webm  
-application/pdf, text/csv
-Excel files
-```
+Código atual:
+├── Usa: LOVABLE_API_KEY + Lovable Gateway
+├── Modelo: google/gemini-3-flash-preview
+└── Resultado: Erro (chave não configurada para Gemini)
 
-Arquivos `.txt` usam `text/plain` que **não está na lista**.
+Você tem:
+├── OPENAI_API_KEY ✓ (configurada)
+└── LOVABLE_API_KEY (não usada)
+```
 
 ---
 
 ## Solução
 
-Executar uma migration SQL para atualizar o bucket e adicionar os MIME types que faltam:
+Reescrever `supabase/functions/analyze-evidences/index.ts` para:
 
-```sql
-UPDATE storage.buckets 
-SET allowed_mime_types = ARRAY[
-  'audio/mpeg', 
-  'audio/mp3', 
-  'audio/wav', 
-  'audio/x-m4a',
-  'video/mp4', 
-  'video/webm', 
-  'application/pdf', 
-  'text/csv',
-  'text/plain',
-  'text/markdown',
-  'application/vnd.ms-excel', 
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-]
-WHERE name = 'project-files';
+1. Importar a biblioteca oficial OpenAI para Deno
+2. Usar `OPENAI_API_KEY` do ambiente
+3. Chamar modelo `gpt-4o`
+4. Manter o mesmo System Prompt do Auditor de Vendas
+
+---
+
+## Mudanças Técnicas
+
+| De (atual) | Para (novo) |
+|------------|-------------|
+| Lovable AI Gateway | OpenAI API direta |
+| `LOVABLE_API_KEY` | `OPENAI_API_KEY` |
+| `google/gemini-3-flash-preview` | `gpt-4o` |
+| `fetch()` manual | SDK `OpenAI` oficial |
+
+---
+
+## Nova Implementação
+
+**Import:**
+```typescript
+import OpenAI from 'https://deno.land/x/openai@v4.28.0/mod.ts';
+```
+
+**Cliente:**
+```typescript
+const openai = new OpenAI({ 
+  apiKey: Deno.env.get('OPENAI_API_KEY') 
+});
+```
+
+**Chamada:**
+```typescript
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [...],
+  tools: [...],
+  tool_choice: { type: 'function', function: { name: 'extract_evidences' } }
+});
 ```
 
 ---
 
-## MIME Types a Adicionar
+## System Prompt (Mantido)
 
-| Extensão | MIME Type |
-|----------|-----------|
-| `.txt` | `text/plain` |
-| `.md` | `text/markdown` |
-| `.m4a` | `audio/x-m4a` |
+O prompt do Auditor de Vendas B2B permanece idêntico, classificando evidências nos 5 pilares.
+
+---
+
+## Arquivo a Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/analyze-evidences/index.ts` | Reescrever |
 
 ---
 
 ## Resultado Esperado
 
-Após a migration:
-1. Upload de `.txt` funcionará
-2. Upload de `.md` funcionará
-3. Upload de `.m4a` funcionará
-4. A IA irá analisar o conteúdo e extrair evidências
+1. Edge Function usa `OPENAI_API_KEY` que você já configurou
+2. Modelo GPT-4o processa os textos
+3. Extração de evidências funciona corretamente
+4. Upload no Vault dispara a análise com sucesso
 
