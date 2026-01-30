@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProjectSwitcher } from './ProjectSwitcher';
+import { UserMenu } from './UserMenu';
 
 const navItems = [
   {
@@ -107,8 +108,14 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Collapse Toggle */}
-      <div className="p-3 border-t border-border/50">
+      {/* User Menu & Collapse Toggle */}
+      <div className="p-3 border-t border-border/50 space-y-2">
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between px-2")}>
+          <UserMenu />
+          {!collapsed && (
+            <span className="text-xs text-muted-foreground">Minha conta</span>
+          )}
+        </div>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors active-scale"
