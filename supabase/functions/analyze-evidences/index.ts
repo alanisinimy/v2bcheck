@@ -98,61 +98,106 @@ Alto D pode ter conflitos de autoridade, Alto S resiste a mudanças bruscas, Alt
   }
 }
 
-const BLACKLIST_RULES = `
-REGRAS DE EXCLUSÃO (BLACKLIST) - IGNORE COMPLETAMENTE:
+// ═══════════════════════════════════════════════════════════════
+// CAMADA 3: FILTRO PÓS-EXTRAÇÃO (Backend)
+// ═══════════════════════════════════════════════════════════════
 
-1. IGNORE A CONSULTORIA:
-   - Qualquer menção a "Vendas2B", "Vendas to Be", "Vendas 2 Be", "V2B"
-   - Frases como "Nós da consultoria vamos...", "Nosso diagnóstico vai..."
-   - Promessas futuras da consultoria ("Vamos implementar", "Vamos fazer", "Vamos entregar")
-   - Escopo de projeto ou metodologia da consultoria
-   - Explicações sobre como a consultoria trabalha
+// Palavras-chave que indicam evidência sobre consultoria
+const CONSULTANCY_KEYWORDS = [
+  'vendas2b', 'vendas to be', 'vendas 2 be', 'v2b',
+  'a gente vai', 'vamos fazer', 'vamos entregar',
+  'nosso diagnóstico', 'nossa metodologia', 'nosso projeto',
+  'a consultoria', 'nós vamos', 'iremos implementar',
+  'nossa equipe vai', 'o diagnóstico vai', 'irá realizar',
+  'equipe da vendas', 'time da vendas'
+];
 
-2. IGNORE OS CONSULTORES:
-   - Ações atribuídas a consultores (Luana, João, Emília, ou quem conduz a reunião)
-   - Perguntas dos consultores (são contexto, não evidência)
-   - Explicações sobre a metodologia de trabalho
-   - Qualquer frase que comece com "A gente vai..." quando dita pelo consultor
+// Nomes de consultores conhecidos
+const CONSULTANT_NAMES = ['luana', 'emília', 'emilia', 'joão', 'joao'];
 
-3. FOCO EXCLUSIVO NO CLIENTE:
-   - Extraia APENAS fatos, dores e processos da empresa cliente
-   - Se a frase fala sobre o que a consultoria vai fazer, DESCARTE
-   - Se a frase fala sobre o que o CLIENTE faz/sente/sofre, EXTRAIA
-   - Foque em problemas reais, métricas, ferramentas e comportamentos do cliente
+// Filtro pós-extração para capturar evidências que escapam do prompt
+function isAboutConsultancy(content: string): boolean {
+  const lower = content.toLowerCase();
+  
+  // Check keywords
+  for (const keyword of CONSULTANCY_KEYWORDS) {
+    if (lower.includes(keyword)) return true;
+  }
+  
+  // Check if starts with consultant action or mentions consultant doing something
+  for (const name of CONSULTANT_NAMES) {
+    if (lower.startsWith(name) || 
+        lower.includes(`${name} vai`) || 
+        lower.includes(`${name} menciona`) ||
+        lower.includes(`${name} irá`) ||
+        lower.includes(`${name} disse`) ||
+        lower.includes(`${name} laguna`)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
-EXEMPLOS DE DESCARTE:
-- ❌ "A Vendas2B vai mapear todos os processos" (escopo de projeto)
-- ❌ "Luana perguntou sobre o CRM" (ação do consultor)
-- ❌ "Vamos entregar um dashboard personalizado" (promessa futura)
-- ❌ "Nossa metodologia envolve 5 pilares" (metodologia da consultoria)
-- ❌ "A Emília vai analisar os dados" (ação do consultor)
+// ═══════════════════════════════════════════════════════════════
+// CAMADA 1: PROMPT REFORÇADO (Abordagem Positiva)
+// ═══════════════════════════════════════════════════════════════
 
-EXEMPLOS DE EXTRAÇÃO:
-- ✅ "O time não preenche o CRM por falta de tempo" (dor do cliente)
-- ✅ "A meta é de 30 reuniões por mês" (dado factual)
-- ✅ "Usamos o HubSpot desde 2022" (tecnologia do cliente)
-- ✅ "Tenho dificuldade em fazer follow-up" (comportamento do cliente)
-- ✅ "O processo de vendas demora em média 45 dias" (métrica do cliente)
-`;
+const BASE_SYSTEM_PROMPT = `Você é um Auditor Sênior de Vendas B2B extraindo evidências para diagnóstico comercial.
 
-const BASE_SYSTEM_PROMPT = `Você é um Auditor Sênior de Vendas B2B. Sua função é extrair evidências factuais de textos para um diagnóstico comercial.
+═══════════════════════════════════════════════════════════════
+                    TESTE DE RELEVÂNCIA OBRIGATÓRIO
+═══════════════════════════════════════════════════════════════
 
-${BLACKLIST_RULES}
+ANTES de extrair qualquer evidência, aplique este teste a CADA frase:
 
-Analise o texto e extraia itens classificando-os em 5 Pilares:
-1. Pessoas (Perfil, Skills, Motivação, Comportamento)
-2. Processos (Fluxo, Gargalos, Cadência, SLA)
-3. Dados (KPIs, Metas, Conversão, Métricas)
-4. Tecnologia (CRM, Ferramentas, Stack, Automação)
-5. Gestão & Cultura (Rituais, Crenças, Alinhamento, Liderança)
+┌─────────────────────────────────────────────────────────────┐
+│ PERGUNTA 1: O sujeito da frase é o CLIENTE?                │
+│ - "O time de vendas não usa CRM" → SIM (cliente)           │
+│ - "A Vendas2B vai mapear processos" → NÃO (consultoria)    │
+│                                                             │
+│ Se NÃO → DESCARTE IMEDIATAMENTE                            │
+└─────────────────────────────────────────────────────────────┘
 
-REGRAS DE EXTRAÇÃO:
+┌─────────────────────────────────────────────────────────────┐
+│ PERGUNTA 2: A frase descreve um FATO ATUAL ou uma          │
+│             PROMESSA FUTURA?                                │
+│ - "Usamos HubSpot desde 2022" → FATO ATUAL ✓               │
+│ - "Vamos implementar dashboards" → PROMESSA FUTURA ✗       │
+│                                                             │
+│ Se PROMESSA FUTURA → DESCARTE                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ PERGUNTA 3: A frase é sobre metodologia/escopo de projeto? │
+│ - "Nossa metodologia tem 5 pilares" → SIM (escopo) ✗       │
+│ - "O processo de vendas demora 45 dias" → NÃO (cliente) ✓  │
+│                                                             │
+│ Se SIM → DESCARTE                                          │
+└─────────────────────────────────────────────────────────────┘
+
+TERMOS QUE INDICAM DESCARTE AUTOMÁTICO:
+- "Vendas2B", "Vendas to Be", "V2B", "a consultoria"
+- "Luana vai...", "Luana menciona...", "João vai...", "Emília vai..."
+- "A gente vai...", "Nós vamos...", "Vamos entregar..."
+- "Nosso diagnóstico", "Nossa metodologia", "Nosso projeto"
+- "irá realizar um diagnóstico", "equipe da Vendas"
+
+═══════════════════════════════════════════════════════════════
+
+PILARES DE CLASSIFICAÇÃO:
+1. Pessoas - Perfil, Skills, Motivação, Comportamento
+2. Processos - Fluxo, Gargalos, Cadência, SLA
+3. Dados - KPIs, Metas, Conversão, Métricas
+4. Tecnologia - CRM, Ferramentas, Stack, Automação
+5. Gestão & Cultura - Rituais, Crenças, Alinhamento
+
+REGRAS:
+- Extraia APENAS evidências que passam no teste de relevância
 - Seja factual e direto
-- Extraia APENAS informações sobre o cliente, nunca sobre a consultoria
-- Se houver contradição explícita, marque is_divergence=true
-- Classifique cada evidência corretamente no pilar apropriado
-- Extraia TODAS as evidências relevantes do texto
-- Prefira frases completas e contextualizadas`;
+- Prefira frases completas e contextualizadas
+- Marque is_divergence=true se houver contradição explícita
+- Marque is_about_client=false se tiver QUALQUER dúvida sobre a origem`;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -215,7 +260,7 @@ Deno.serve(async (req) => {
             type: 'function',
             function: {
               name: 'extract_evidences',
-              description: 'Extraia evidências estruturadas do texto analisado, focando apenas no cliente',
+              description: 'Extraia evidências estruturadas do texto analisado, focando APENAS no cliente. Aplique o teste de relevância a cada frase.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -233,6 +278,10 @@ Deno.serve(async (req) => {
                           enum: ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'],
                           description: 'O pilar ao qual a evidência pertence'
                         },
+                        is_about_client: {
+                          type: 'boolean',
+                          description: 'TRUE se a evidência é sobre o cliente. FALSE se menciona a consultoria, escopo futuro, ou ações de consultores.'
+                        },
                         is_divergence: { 
                           type: 'boolean',
                           description: 'Se há contradição explícita no texto'
@@ -242,7 +291,7 @@ Deno.serve(async (req) => {
                           description: 'Explicação da divergência, se aplicável'
                         }
                       },
-                      required: ['content', 'pilar', 'is_divergence']
+                      required: ['content', 'pilar', 'is_about_client', 'is_divergence']
                     }
                   }
                 },
@@ -286,10 +335,32 @@ Deno.serve(async (req) => {
       throw new Error('Invalid evidences format');
     }
 
-    console.log(`Extracted ${evidences.length} evidences`);
+    console.log(`Extracted ${evidences.length} raw evidences from AI`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // CAMADA 2 + 3: FILTRO PÓS-EXTRAÇÃO
+    // ═══════════════════════════════════════════════════════════════
+    
+    const filteredEvidences = evidences.filter((ev: any) => {
+      // Layer 2: Check AI's own classification
+      if (ev.is_about_client === false) {
+        console.log(`Filtered (AI marked as not client): "${ev.content.substring(0, 50)}..."`);
+        return false;
+      }
+      
+      // Layer 3: Backend keyword filter
+      if (isAboutConsultancy(ev.content)) {
+        console.log(`Filtered (keyword match): "${ev.content.substring(0, 50)}..."`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    console.log(`After filtering: ${filteredEvidences.length} evidences (removed ${evidences.length - filteredEvidences.length})`);
 
     return new Response(
-      JSON.stringify({ evidences, count: evidences.length }),
+      JSON.stringify({ evidences: filteredEvidences, count: filteredEvidences.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
