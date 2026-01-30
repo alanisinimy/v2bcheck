@@ -1,194 +1,219 @@
 
-# Plano: Matriz de Diagnóstico - Transformação para Visualização de Auditoria Profissional
+# Plano: Transformar Extração de Citações em Análise de Gaps Estratégicos
 
-## Objetivo
-Transformar a tela de Matriz de Diagnóstico de um layout informal de cards (estilo Trello) para uma tabela densa e profissional (estilo McKinsey/Deloitte), com novas colunas de dados e UX aprimorada.
+## Problema Atual
+A IA extrai micro-fatos e frases soltas, resultando em 50+ evidências fragmentadas por reunião. Isso gera ruído e trabalho manual excessivo para o consultor.
+
+## Solução Proposta
+Mudar a abordagem de "auditor que anota citações" para "consultor estratégico que identifica gaps de mercado", produzindo 5-8 gaps consolidados e acionáveis por arquivo.
 
 ---
 
 ## Resumo das Mudanças
 
-| Componente | Ação |
-|------------|------|
-| `src/pages/Matriz.tsx` | Substituir grid de cards por componente de tabela |
-| `src/components/matriz/EvidenceCard.tsx` | Remover (não será mais usado) |
-| `src/components/matriz/FilterBar.tsx` | Simplificar para filtros de tabela (Pilar + Criticidade) |
-| `src/components/matriz/EvidenceTable.tsx` | **Novo** - Componente de tabela profissional |
-| `src/components/matriz/EvidenceTableRow.tsx` | **Novo** - Linha da tabela com ações |
-| `src/components/matriz/EditEvidenceDialog.tsx` | **Novo** - Modal de edição |
-| `src/lib/types.ts` | Adicionar novos tipos (Impacto, Criticidade) |
-| `supabase/migrations/` | Adicionar colunas no banco de dados |
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `supabase/functions/analyze-evidences/index.ts` | Reescrever | Nova persona + schema de output + regras de condensação |
+| `src/hooks/useAnalyzeEvidences.ts` | Modificar | Adaptar interface para receber novos campos |
+| `src/lib/types.ts` | Adicionar | Novo tipo `ImpactType` com valor `cultura` |
 
 ---
 
 ## Detalhamento Técnico
 
-### 1. Migração do Banco de Dados
+### 1. Nova Persona no System Prompt
 
-Adicionar três novas colunas à tabela `evidences`:
+Trocar a persona de "Auditor Sênior" para "Consultor Estratégico McKinsey":
 
-```sql
--- Adicionar novos campos para visão de auditoria
-ALTER TABLE public.evidences 
-ADD COLUMN benchmark text,
-ADD COLUMN impact text CHECK (impact IN ('receita', 'eficiencia', 'risco')),
-ADD COLUMN criticality text DEFAULT 'media' CHECK (criticality IN ('alta', 'media', 'baixa')),
-ADD COLUMN sequential_id integer;
+```text
+Você é um Consultor Estratégico Sênior estilo McKinsey/Deloitte.
 
--- Criar função para gerar ID sequencial por projeto
-CREATE OR REPLACE FUNCTION generate_evidence_sequential_id()
-RETURNS TRIGGER AS $$
-BEGIN
-  SELECT COALESCE(MAX(sequential_id), 0) + 1
-  INTO NEW.sequential_id
-  FROM public.evidences
-  WHERE project_id = NEW.project_id;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+Sua missão: Identificar GAPS DE MERCADO que impedem a empresa 
+de atingir seu potencial de vendas.
 
--- Trigger para auto-incrementar ID sequencial
-CREATE TRIGGER set_evidence_sequential_id
-BEFORE INSERT ON public.evidences
-FOR EACH ROW
-EXECUTE FUNCTION generate_evidence_sequential_id();
-
--- Atualizar registros existentes com IDs sequenciais
-WITH numbered AS (
-  SELECT id, ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY created_at) as seq
-  FROM public.evidences
-)
-UPDATE public.evidences e
-SET sequential_id = n.seq
-FROM numbered n
-WHERE e.id = n.id;
+Você NÃO extrai citações. Você SINTETIZA problemas estratégicos.
 ```
 
-### 2. Atualizar Types (`src/lib/types.ts`)
+### 2. Novo JSON Schema de Output
 
-```typescript
-export type ImpactType = 'receita' | 'eficiencia' | 'risco';
-export type CriticalityType = 'alta' | 'media' | 'baixa';
+O output da IA passará a retornar objetos completos:
 
-export const IMPACT_CONFIG: Record<ImpactType, { label: string; icon: string }> = {
-  receita: { label: 'Receita', icon: 'TrendingUp' },
-  eficiencia: { label: 'Eficiencia', icon: 'Zap' },
-  risco: { label: 'Risco', icon: 'AlertTriangle' },
-};
-
-export const CRITICALITY_CONFIG: Record<CriticalityType, { label: string; color: string }> = {
-  alta: { label: 'Alta', color: 'bg-destructive/15 text-destructive border-destructive/30' },
-  media: { label: 'Media', color: 'bg-warning/15 text-warning border-warning/30' },
-  baixa: { label: 'Baixa', color: 'bg-success/15 text-success border-success/30' },
-};
-
-// Atualizar interface Evidence
-export interface Evidence {
-  // ... campos existentes
-  benchmark?: string;
-  impact?: ImpactType;
-  criticality?: CriticalityType;
-  sequential_id?: number;
+```json
+{
+  "gaps": [
+    {
+      "gap": "Baixa adoção de CRM com dados não confiáveis",
+      "pilar": "tecnologia",
+      "benchmark": "Gestão centralizada de pipeline com dados limpos e atualizados diariamente",
+      "impacto": "receita",
+      "criticidade": "alta",
+      "is_divergence": false
+    }
+  ]
 }
 ```
 
-### 3. Novo Componente: `EvidenceTable.tsx`
+**Campos:**
+- `gap`: Descrição sintética do problema (sem aspas, narrativa)
+- `pilar`: Um dos 5 pilares
+- `benchmark`: Qual é a melhor prática de mercado que está faltando
+- `impacto`: `receita` | `eficiencia` | `risco` | `cultura`
+- `criticidade`: `alta` | `media` | `baixa`
+- `is_divergence`: Se há conflito entre fontes
 
-Estrutura da tabela usando shadcn/ui Table:
+### 3. Regras de Condensação no Prompt
 
-```text
-+-----+----------+--------------------------------+-----------------------+-----------+------------+---------+
-| ID  | Pilar    | Gap Identificado               | Benchmark (O Ideal)   | Impacto   | Criticidade| Acoes   |
-+-----+----------+--------------------------------+-----------------------+-----------+------------+---------+
-| G01 | [Badge]  | Texto longo da evidencia...    | Funil estruturado...  | Receita   | [Alta]     | [...] |
-| G02 | [Badge]  | Outro gap identificado...      | Processo definido...  | Eficiencia| [Media]    | [...] |
-+-----+----------+--------------------------------+-----------------------+-----------+------------+---------+
-```
-
-**Caracteristicas:**
-- ID formatado como "G01", "G02", etc.
-- Badge colorida compacta para Pilar (sem icone de emoji)
-- Coluna "Gap Identificado" com largura maior (~40% da tabela)
-- Coluna "Benchmark" editavel
-- Badge colorida para Criticidade (vermelha/amarela/verde)
-- Menu dropdown para acoes (Editar, Validar, Rejeitar, Excluir)
-
-### 4. Filtros Simplificados no Topo
-
-Substituir FilterBar atual por filtros inline mais discretos:
+Instruções explícitas para agrupar problemas relacionados:
 
 ```text
-[Pilar: Todos v] [Criticidade: Todas v] [Buscar...]     Mostrando 15 de 42 gaps
+REGRAS DE CONDENSAÇÃO (MENOS É MAIS):
+
+1. NÃO crie um gap para cada frase. AGRUPE problemas relacionados.
+   - Se 3 pessoas reclamam do CRM → UM ÚNICO GAP
+   - Se há problemas de follow-up e cadência → UM GAP de "Processo Comercial"
+
+2. IGNORE fatos neutros ou biográficos:
+   - "Tatiane trabalha desde 2012" → NÃO É GAP
+   - "A empresa tem 50 funcionários" → NÃO É GAP
+   
+3. FOCO EM PROBLEMAS, RISCOS E OPORTUNIDADES PERDIDAS:
+   - Só registre algo que representa uma perda de receita,
+     ineficiência, risco operacional ou barreira cultural.
+
+4. LIMITE: Máximo 8 gaps por análise.
+   - Se identificar mais de 8, priorize os de maior impacto.
 ```
 
-**Filtros disponiveis:**
-- Pilar (dropdown)
-- Criticidade (dropdown)
-- Campo de busca por texto
-
-### 5. Paginacao
-
-Implementar paginacao com 20 itens por pagina usando componente Pagination do shadcn/ui:
+### 4. Critérios de Criticidade
 
 ```text
-Mostrando 1-20 de 42 gaps    [< Anterior] [1] [2] [3] [Proximo >]
+CRITÉRIO DE CRITICIDADE:
+
+ALTA (Vermelha):
+- Afeta diretamente a receita (perda de deals, churn)
+- Impede a operação (sistema crítico quebrado)
+- Risco de compliance ou legal
+
+MÉDIA (Amarela):
+- Gera ineficiência ou retrabalho significativo
+- Reduz produtividade do time
+- Afeta experiência do cliente indiretamente
+
+BAIXA (Verde):
+- Incômodo ou melhoria estética
+- "Nice to have" sem impacto mensurável
+- Otimizações de baixa prioridade
 ```
 
-### 6. Dialog de Edicao (`EditEvidenceDialog.tsx`)
+### 5. Atualização do Hook Frontend
 
-Modal para editar todos os campos de uma evidencia:
+Modificar `useAnalyzeEvidences.ts` para:
 
-- Gap Identificado (textarea)
-- Benchmark (textarea)
-- Pilar (select)
-- Impacto (select)
-- Criticidade (select)
-- Status (botoes radio)
+1. Receber nova interface de ExtractedGap
+2. Mapear campos para insert no banco (já temos as colunas)
+3. Remover lógica de deduplicação (IA já consolida)
 
-### 7. Hooks Adicionais
+**Nova interface:**
+```typescript
+interface ExtractedGap {
+  gap: string;          // Vai para `content`
+  pilar: Pilar;
+  benchmark: string;
+  impacto: ImpactType;
+  criticidade: CriticalityType;
+  is_divergence: boolean;
+  divergence_description?: string;
+}
+```
 
-**useUpdateEvidence** - Mutation para atualizar campos da evidencia
-**useDeleteEvidence** - Mutation para excluir evidencia
+### 6. Adicionar Valor `cultura` ao ImpactType
+
+Atualizar `src/lib/types.ts`:
+
+```typescript
+export type ImpactType = 'receita' | 'eficiencia' | 'risco' | 'cultura';
+
+export const IMPACT_CONFIG: Record<ImpactType, { label: string; icon: string }> = {
+  receita: { label: 'Receita', icon: 'TrendingUp' },
+  eficiencia: { label: 'Eficiência', icon: 'Zap' },
+  risco: { label: 'Risco', icon: 'AlertTriangle' },
+  cultura: { label: 'Cultura', icon: 'Users' },
+};
+```
 
 ---
 
-## Arquivos a Criar/Modificar
+## Fluxo de Dados Atualizado
 
-| Arquivo | Acao |
-|---------|------|
-| `supabase/migrations/xxx_add_audit_columns.sql` | Criar |
-| `src/lib/types.ts` | Modificar |
-| `src/components/matriz/EvidenceTable.tsx` | Criar |
-| `src/components/matriz/EvidenceTableRow.tsx` | Criar |
-| `src/components/matriz/TableFilters.tsx` | Criar |
-| `src/components/matriz/EditEvidenceDialog.tsx` | Criar |
-| `src/hooks/useProject.ts` | Modificar (add mutations) |
-| `src/pages/Matriz.tsx` | Modificar |
-| `src/components/matriz/EvidenceCard.tsx` | Manter (nao deletar, apenas nao usar) |
+```text
+Reunião (1h de transcrição)
+         │
+         ▼
+┌─────────────────────────────────┐
+│    Edge Function (analyze)      │
+│                                 │
+│  Persona: Consultor Estratégico │
+│  Objetivo: Identificar GAPS     │
+│  Output: 5-8 gaps consolidados  │
+└─────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────┐
+│  Tabela: evidences              │
+│                                 │
+│  content = gap                  │
+│  pilar = pilar                  │
+│  benchmark = benchmark          │
+│  impact = impacto               │
+│  criticality = criticidade      │
+│  status = 'pendente'            │
+└─────────────────────────────────┘
+         │
+         ▼
+    Tabela Matriz de Diagnóstico
+    (5-8 linhas estratégicas)
+```
 
 ---
 
-## Resultado Visual Esperado
+## Arquivos a Modificar
 
-A nova interface tera aparencia de relatorio de consultoria:
+1. `supabase/functions/analyze-evidences/index.ts`
+   - Reescrever system prompt com nova persona
+   - Alterar function calling schema para novos campos
+   - Remover filtros de keywords (desnecessário com prompt mais focado)
+   - Manter contexto de colaborador (DISC)
 
-- Fundo branco limpo
-- Tabela com bordas sutis
-- Tipografia densa e profissional (texto menor)
-- Badges compactas com cores significativas
-- Acoes discretas em menu dropdown
-- Paginacao clara no rodape
+2. `src/hooks/useAnalyzeEvidences.ts`
+   - Atualizar interface ExtractedEvidence → ExtractedGap
+   - Mapear novos campos para insert
+   - Remover deduplicação
+
+3. `src/lib/types.ts`
+   - Adicionar `cultura` ao ImpactType
+   - Atualizar IMPACT_CONFIG
+
+4. Migração SQL (se necessário)
+   - Adicionar `cultura` ao CHECK constraint de `impact`
 
 ---
 
-## Ordem de Execucao
+## Resultado Esperado
 
-1. Executar migracao do banco de dados (adicionar colunas)
-2. Atualizar tipos TypeScript
-3. Criar componente de tabela
-4. Criar componente de linha
-5. Criar filtros inline
-6. Criar dialog de edicao
-7. Adicionar hooks de mutacao
-8. Atualizar pagina Matriz.tsx
-9. Testar fluxo completo
+| Antes | Depois |
+|-------|--------|
+| 50+ evidências fragmentadas | 5-8 gaps estratégicos |
+| "João disse que o CRM é ruim" | "Baixa adoção de CRM impacta visibilidade do pipeline" |
+| Sem benchmark | Benchmark: "Gestão centralizada com dados confiáveis" |
+| Sem priorização | Criticidade: Alta/Média/Baixa |
+| Consultor precisa consolidar manualmente | Gaps já chegam consolidados e acionáveis |
+
+---
+
+## Ordem de Execução
+
+1. Migração SQL (adicionar `cultura` ao constraint)
+2. Atualizar types.ts
+3. Reescrever edge function
+4. Atualizar hook frontend
+5. Deploy e teste com arquivo real
