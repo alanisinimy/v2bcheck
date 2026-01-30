@@ -1,183 +1,128 @@
 
-# Classificação de Tipo de Fonte no The Vault
+# Entrada de Dados Manuais e Contexto do Projeto
 
-Nova funcionalidade para classificar a origem dos arquivos enviados, contextualizando a análise de evidências.
-
----
-
-## Visão Geral
-
-| Etapa | Descrição |
-|-------|-----------|
-| 1 | Modal de seleção obrigatória ao arrastar/selecionar arquivo |
-| 2 | Persistência do tipo de fonte na tabela `assets` |
-| 3 | Exibição da tag de origem nos cards de evidência na Matriz |
+Duas novas funcionalidades para permitir que o consultor registre informacoes que nao vieram de arquivos gravados.
 
 ---
 
-## 1. Schema do Banco de Dados
+## Visao Geral
 
-Adicionar nova coluna na tabela `assets`:
+| Feature | Descricao |
+|---------|-----------|
+| **1. Aba Visao Geral** | Formulario de contexto do projeto no Dashboard |
+| **2. Evidencia Manual** | Dialog funcional para criar evidencias na Matriz |
 
-| Coluna | Tipo | Default |
-|--------|------|---------|
-| `source_type` | TEXT (ou ENUM) | NULL |
+---
 
-**Valores possíveis (ENUM recomendado):**
+## Feature 1: Aba "Visao Geral" no Dashboard
+
+### 1.1 Schema do Banco de Dados
+
+Adicionar novas colunas na tabela `projects`:
+
+| Coluna | Tipo | Descricao |
+|--------|------|-----------|
+| `client_context` | TEXT | Cenario atual da empresa |
+| `main_pain_points` | TEXT | Dores latentes relatadas |
+| `project_goals` | TEXT | Definicao de sucesso |
+
+### 1.2 Novo Componente: ProjectOverviewForm
+
+Criar `src/components/dashboard/ProjectOverviewForm.tsx`:
+
 ```text
-entrevista_diretoria   → "Entrevista (CEO/Diretoria)"
-entrevista_operacao    → "Entrevista (Time/Operacao)"  
-reuniao_kickoff        → "Reuniao de Kick-off"
-reuniao_vendas         → "Reuniao de Vendas (Gravada)"
-briefing               → "Briefing / Formulario Respondido"
-documentacao           → "Documentacao Tecnica (Processos/Playbook)"
+Formulario com:
+├── Textarea: "Contexto da Empresa"
+│   └── Placeholder: "Descreva o cenario atual da empresa..."
+├── Textarea: "Dores Latentes" 
+│   └── Placeholder: "Quais sao as principais dores relatadas?"
+├── Textarea: "Objetivos do Projeto"
+│   └── Placeholder: "O que define sucesso neste diagnostico?"
+└── Botao: "Salvar Alteracoes"
+```
+
+### 1.3 Dashboard com Tabs
+
+Atualizar `src/pages/Dashboard.tsx`:
+
+```text
+┌─────────────────────────────────────────────────┐
+│ [Metricas] [Visao Geral]                        │  ← Tabs
+├─────────────────────────────────────────────────┤
+│ Conteudo da aba selecionada                     │
+└─────────────────────────────────────────────────┘
+```
+
+**Aba Metricas:** Conteudo atual do Dashboard (cards, pilares, divergencias)
+**Aba Visao Geral:** Formulario de contexto do projeto
+
+### 1.4 Hook de Update
+
+Criar `src/hooks/useUpdateProject.ts`:
+
+```text
+useUpdateProject()
+├── Aceita: { projectId, client_context, main_pain_points, project_goals }
+├── Executa: UPDATE na tabela projects
+└── Invalida: queries do projeto atual
 ```
 
 ---
 
-## 2. Novo Componente: Modal de Classificacao
+## Feature 2: Evidencia Manual na Matriz
 
-Criar `src/components/vault/SourceTypeModal.tsx`:
+### 2.1 Atualizar Source Types
+
+Adicionar nova opcao ao ENUM `source_type`:
+
+| Valor | Label |
+|-------|-------|
+| `observacao_consultor` | "Observacao do Consultor" |
+
+### 2.2 Novo Tipo: Evidence Type
+
+Adicionar coluna na tabela `evidences`:
+
+| Coluna | Tipo | Default | Descricao |
+|--------|------|---------|-----------|
+| `evidence_type` | ENUM | 'fato' | Fato, Divergencia, Ponto Forte |
+
+### 2.3 Novo Componente: AddEvidenceDialog
+
+Criar `src/components/matriz/AddEvidenceDialog.tsx`:
 
 ```text
 Dialog com:
-├── Titulo: "Qual e a origem deste arquivo?"
-├── Subtitulo: nome do arquivo sendo classificado
-├── 6 opcoes de radio com icones:
-│   ├── Entrevista (CEO/Diretoria)
-│   ├── Entrevista (Time/Operacao)
-│   ├── Reuniao de Kick-off
-│   ├── Reuniao de Vendas (Gravada)
-│   ├── Briefing / Formulario Respondido
-│   └── Documentacao Tecnica
-└── Botao "Processar Arquivo" (disabled ate selecionar)
+├── Titulo: "Nova Evidencia Manual"
+├── Campos:
+│   ├── Textarea: "Conteudo da Evidencia" (obrigatorio)
+│   │   └── Placeholder: "Descreva a evidencia observada..."
+│   ├── Select: "Pilar" (obrigatorio)
+│   │   └── Opcoes: Pessoas, Processos, Dados, Tecnologia, Gestao
+│   ├── Select: "Fonte/Origem" (obrigatorio)
+│   │   └── Opcoes: Lista de source_types + "Observacao do Consultor"
+│   └── Select: "Tipo" (obrigatorio)
+│       └── Opcoes: Fato, Divergencia, Ponto Forte
+├── Logica:
+│   ├── Se tipo = "Divergencia": exibe campo extra para descricao
+│   └── Status = 'validado' automaticamente (evidencia manual = validada)
+└── Botao: "Salvar Evidencia"
 ```
 
----
+### 2.4 Atualizar Matriz.tsx
 
-## 3. Fluxo de Upload Atualizado
-
-**Vault.tsx - Novo fluxo:**
+Substituir o botao de teste por um botao que abre o dialog:
 
 ```text
-1. Usuario arrasta/seleciona arquivos
-2. Para CADA arquivo:
-   a. Abre modal de classificacao
-   b. Usuario seleciona source_type
-   c. Fecha modal
-   d. Inicia upload com source_type
-3. Continua processamento normal (IA, etc)
+Antes:  <Button>Add Evidencia (Teste)</Button>
+Depois: <Button>+ Nova Evidencia</Button> → Abre AddEvidenceDialog
 ```
 
-**Implementacao:**
-- Estado para armazenar arquivos pendentes: `pendingFiles: File[]`
-- Estado para arquivo atual sendo classificado: `currentFileIndex: number`
-- Estado para source_type selecionado: `selectedSourceType: SourceType`
-- Modal controlado: `isModalOpen: boolean`
+### 2.5 Atualizar Hook useCreateEvidence
 
----
-
-## 4. Atualizacao do Hook de Upload
-
-**useUploadAsset.ts:**
-
-```text
-interface UploadAssetData {
-  projectId: string;
-  file: File;
-  sourceType: SourceType;  // NOVO
-}
-
-// Insert agora inclui:
-.insert({
-  ...
-  source_type: sourceType,
-})
-```
-
----
-
-## 5. Propagacao para Evidencias
-
-**useAnalyzeEvidences.ts:**
-
-Atualizar `source_description` para incluir o tipo de fonte:
-
-```text
-Antes:  "Arquivo: reuniao.mp3"
-Depois: "Entrevista (CEO/Diretoria) • reuniao.mp3"
-```
-
-**Novo parametro:**
-```text
-interface AnalyzeEvidencesParams {
-  ...
-  sourceType: SourceType;  // NOVO
-}
-```
-
----
-
-## 6. Exibicao na Matriz
-
-**EvidenceCard.tsx:**
-
-Atualizar secao de source para exibir tag formatada:
-
-```text
-Antes:
-└── "Arquivo: christian.mp3"
-
-Depois:
-└── Badge com icone + tipo de fonte + nome do arquivo
-    Exemplo: "Entrevista (Diretoria) • christian.mp3"
-```
-
-Layout proposto:
-```text
-┌─────────────────────────────────────┐
-│ Pessoas │ Divergência               │
-├─────────────────────────────────────┤
-│ Evidência: O time de vendas...      │
-├─────────────────────────────────────┤
-│ Entrevista (CEO/Diretoria) • arq.mp3│
-├─────────────────────────────────────┤
-│ [Validar] [Rejeitar] [Investigar]   │
-└─────────────────────────────────────┘
-```
-
----
-
-## 7. Tipos TypeScript
-
-**src/lib/types.ts:**
-
-```text
-// Novo tipo
-export type SourceType = 
-  | 'entrevista_diretoria'
-  | 'entrevista_operacao'
-  | 'reuniao_kickoff'
-  | 'reuniao_vendas'
-  | 'briefing'
-  | 'documentacao';
-
-// Configuracao de exibicao
-export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> = {
-  entrevista_diretoria: { label: 'Entrevista (CEO/Diretoria)', icon: '🎤' },
-  entrevista_operacao: { label: 'Entrevista (Time/Operacao)', icon: '👥' },
-  reuniao_kickoff: { label: 'Reuniao de Kick-off', icon: '🚀' },
-  reuniao_vendas: { label: 'Reuniao de Vendas (Gravada)', icon: '📞' },
-  briefing: { label: 'Briefing / Formulario', icon: '📝' },
-  documentacao: { label: 'Documentacao Tecnica', icon: '📄' },
-};
-
-// Atualizar interface Asset
-export interface Asset {
-  ...
-  source_type?: SourceType;
-}
-```
+Adicionar suporte para:
+- `evidence_type` (fato | divergencia | ponto_forte)
+- Status default 'validado' para evidencias manuais
 
 ---
 
@@ -185,20 +130,47 @@ export interface Asset {
 
 | Arquivo | Acao |
 |---------|------|
-| **Migracao SQL** | Criar ENUM e adicionar coluna `source_type` |
-| `src/lib/types.ts` | Adicionar tipo `SourceType` e config |
-| `src/components/vault/SourceTypeModal.tsx` | **NOVO** - Modal de classificacao |
-| `src/pages/Vault.tsx` | Integrar modal no fluxo de upload |
-| `src/hooks/useUploadAsset.ts` | Aceitar `sourceType` no upload |
-| `src/hooks/useAnalyzeEvidences.ts` | Formatar `source_description` com tipo |
-| `src/components/vault/AssetCard.tsx` | Exibir badge do tipo de fonte |
-| `src/components/matriz/EvidenceCard.tsx` | Formatar exibicao com icone + tipo |
+| **Migracao SQL #1** | Adicionar colunas context na tabela projects |
+| **Migracao SQL #2** | Adicionar ENUM evidence_type e coluna na evidences |
+| **Migracao SQL #3** | Adicionar 'observacao_consultor' ao ENUM source_type |
+| `src/lib/types.ts` | Atualizar tipos Project, SourceType, adicionar EvidenceType |
+| `src/hooks/useUpdateProject.ts` | **NOVO** - Hook para update do contexto |
+| `src/components/dashboard/ProjectOverviewForm.tsx` | **NOVO** - Formulario de contexto |
+| `src/pages/Dashboard.tsx` | Adicionar tabs (Metricas + Visao Geral) |
+| `src/components/matriz/AddEvidenceDialog.tsx` | **NOVO** - Dialog para evidencia manual |
+| `src/pages/Matriz.tsx` | Integrar AddEvidenceDialog |
+| `src/hooks/useCreateEvidence.ts` | Adicionar evidence_type |
+| `src/components/matriz/EvidenceCard.tsx` | Exibir badge do evidence_type |
+
+---
+
+## Fluxo de Uso
+
+### Feature 1: Contexto do Projeto
+```text
+1. Usuario acessa Dashboard
+2. Clica na aba "Visao Geral"
+3. Preenche campos de contexto
+4. Clica "Salvar Alteracoes"
+5. Dados persistidos na tabela projects
+```
+
+### Feature 2: Evidencia Manual
+```text
+1. Usuario acessa Matriz de Diagnostico
+2. Clica em "+ Nova Evidencia"
+3. Dialog abre com formulario
+4. Preenche: conteudo, pilar, fonte, tipo
+5. Clica "Salvar Evidencia"
+6. INSERT na tabela evidences com status = 'validado'
+7. Card aparece na Matriz com badge do tipo
+```
 
 ---
 
 ## Resultado Esperado
 
-1. **Vault**: Ao arrastar arquivo, modal aparece pedindo classificacao
-2. **Vault**: AssetCard mostra badge do tipo de fonte
-3. **Matriz**: Cards mostram origem contextualizada (ex: "Entrevista (Diretoria) • christian.mp3")
-4. **Contexto**: Consultor sabe se evidencia veio de gestor, time ou documento
+1. **Dashboard**: Nova aba "Visao Geral" para documentar contexto do projeto
+2. **Matriz**: Botao "+ Nova Evidencia" abre dialog funcional
+3. **Evidencias Manuais**: Salvas com status validado e fonte apropriada
+4. **Cards na Matriz**: Exibem tipo da evidencia (Fato, Divergencia, Ponto Forte)
