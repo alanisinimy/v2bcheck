@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { CollaboratorCard } from '@/components/team/CollaboratorCard';
 import { AddCollaboratorDialog } from '@/components/team/AddCollaboratorDialog';
 import { PeopleDataUploadZone } from '@/components/team/PeopleDataUploadZone';
-import { PeopleDataTypeModal } from '@/components/team/PeopleDataTypeModal';
+import { PeopleDataBatchModal, type ClassifiedFile } from '@/components/team/PeopleDataBatchModal';
 import { TeamDistributionChart } from '@/components/team/DiscProfileBars';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import {
@@ -41,11 +41,12 @@ export default function Team() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [analyzingFitId, setAnalyzingFitId] = useState<string | null>(null);
   
-  // People data upload state
+  // Batch upload state
   const [showUploadZone, setShowUploadZone] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [currentProcessingIndex, setCurrentProcessingIndex] = useState(0);
 
   const distribution = useTeamDistribution(collaborators);
 
@@ -181,114 +182,124 @@ export default function Team() {
     }
   };
 
-  // People data upload handlers
+  // Batch upload handlers
   const handleFilesSelected = useCallback((files: File[]) => {
-    if (files.length > 0) {
-      setPendingFile(files[0]);
-      setIsTypeModalOpen(true);
-    }
+    if (files.length === 0) return;
+    
+    setPendingFiles(files);
+    setIsBatchModalOpen(true);
   }, []);
 
-  const handleProcessPeopleData = useCallback(async (dataType: PeopleDataType, collaboratorId?: string) => {
-    if (!currentProject || !pendingFile) return;
+  const handleBatchProcess = useCallback(async (classifiedFiles: ClassifiedFile[]) => {
+    if (!currentProject || classifiedFiles.length === 0) return;
     
     setIsProcessingFile(true);
+    setCurrentProcessingIndex(0);
+    
+    let successCount = 0;
+    let errorCount = 0;
     
     try {
-      // Extract text from file
-      const textContent = await extractTextFromFile(pendingFile);
-      
-      if (!textContent) {
-        throw new Error('Não foi possível extrair texto do arquivo');
+      for (let i = 0; i < classifiedFiles.length; i++) {
+        setCurrentProcessingIndex(i);
+        const { file, dataType, collaboratorId } = classifiedFiles[i];
+        
+        try {
+          // Extract text from file
+          const textContent = await extractTextFromFile(file);
+          
+          if (!textContent) {
+            throw new Error('Não foi possível extrair texto do arquivo');
+          }
+
+          // Create asset record
+          const { data: asset, error: assetError } = await supabase
+            .from('assets')
+            .insert({
+              project_id: currentProject.id,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              storage_path: `people-data/${Date.now()}-${file.name}`,
+              source_type: dataType === 'perfil_disc' ? 'perfil_disc' : 'pesquisa_clima',
+              collaborator_id: collaboratorId || null,
+              status: 'processing' as const,
+            })
+            .select()
+            .single();
+
+          if (assetError) throw assetError;
+
+          if (dataType === 'perfil_disc') {
+            // Use existing analyze-disc function
+            const { error } = await supabase.functions.invoke('analyze-disc', {
+              body: {
+                projectId: currentProject.id,
+                assetId: asset.id,
+                content: textContent,
+              }
+            });
+
+            if (error) throw error;
+          } else {
+            // Use analyze-people-data function
+            const { error } = await supabase.functions.invoke('analyze-people-data', {
+              body: {
+                projectId: currentProject.id,
+                assetId: asset.id,
+                content: textContent,
+                dataType: 'pesquisa_clima',
+              }
+            });
+
+            if (error) throw error;
+          }
+
+          // Update asset status
+          await supabase
+            .from('assets')
+            .update({ status: 'completed' })
+            .eq('id', asset.id);
+
+          successCount++;
+        } catch (fileError: any) {
+          console.error(`Error processing ${file.name}:`, fileError);
+          errorCount++;
+        }
       }
 
-      // Create asset record
-      const { data: asset, error: assetError } = await supabase
-        .from('assets')
-        .insert({
-          project_id: currentProject.id,
-          file_name: pendingFile.name,
-          file_type: pendingFile.type,
-          file_size: pendingFile.size,
-          storage_path: `people-data/${Date.now()}-${pendingFile.name}`,
-          source_type: dataType === 'perfil_disc' ? 'perfil_disc' : 'pesquisa_clima',
-          collaborator_id: collaboratorId || null,
-          status: 'processing' as const,
-        })
-        .select()
-        .single();
-
-      if (assetError) throw assetError;
-
-      if (dataType === 'perfil_disc') {
-        // Use existing analyze-disc function
-        const { data, error } = await supabase.functions.invoke('analyze-disc', {
-          body: {
-            projectId: currentProject.id,
-            assetId: asset.id,
-            content: textContent,
-          }
-        });
-
-        if (error) throw error;
-
-        // Update asset status
-        await supabase
-          .from('assets')
-          .update({ status: 'completed' })
-          .eq('id', asset.id);
-
-        queryClient.invalidateQueries({ queryKey: ['collaborators', currentProject.id] });
-        
+      queryClient.invalidateQueries({ queryKey: ['collaborators', currentProject.id] });
+      
+      if (successCount > 0) {
         toast({
-          title: data.isNew ? 'Colaborador cadastrado' : 'Perfil atualizado',
-          description: `${data.collaborator?.name || 'Colaborador'} foi ${data.isNew ? 'adicionado ao time' : 'atualizado'}.`,
+          title: 'Arquivos processados',
+          description: `${successCount} arquivo(s) processado(s) com sucesso${errorCount > 0 ? `, ${errorCount} erro(s)` : ''}.`,
         });
       } else {
-        // Use new analyze-people-data function
-        const { data, error } = await supabase.functions.invoke('analyze-people-data', {
-          body: {
-            projectId: currentProject.id,
-            assetId: asset.id,
-            content: textContent,
-            dataType: 'pesquisa_clima',
-          }
-        });
-
-        if (error) throw error;
-
-        // Update asset status
-        await supabase
-          .from('assets')
-          .update({ status: 'completed' })
-          .eq('id', asset.id);
-
-        queryClient.invalidateQueries({ queryKey: ['collaborators', currentProject.id] });
-        
         toast({
-          title: 'Pesquisa processada',
-          description: `${data.collaboratorsUpdated} atualizado(s), ${data.newCollaborators} novo(s).`,
+          title: 'Erro no processamento',
+          description: 'Nenhum arquivo foi processado com sucesso.',
+          variant: 'destructive',
         });
       }
-      
-      setIsTypeModalOpen(false);
-      setPendingFile(null);
-      setShowUploadZone(false);
     } catch (error: any) {
-      console.error('People data processing error:', error);
+      console.error('Batch processing error:', error);
       toast({
         title: 'Erro ao processar',
-        description: error.message || 'Não foi possível processar o arquivo.',
+        description: error.message || 'Erro no processamento em lote.',
         variant: 'destructive',
       });
     } finally {
       setIsProcessingFile(false);
+      setIsBatchModalOpen(false);
+      setPendingFiles([]);
+      setShowUploadZone(false);
     }
-  }, [currentProject, pendingFile, queryClient]);
+  }, [currentProject, queryClient]);
 
-  const handleTypeModalClose = useCallback(() => {
-    setIsTypeModalOpen(false);
-    setPendingFile(null);
+  const handleBatchCancel = useCallback(() => {
+    setIsBatchModalOpen(false);
+    setPendingFiles([]);
   }, []);
 
   const isLoading = isLoadingProject || isLoadingCollaborators;
@@ -436,15 +447,15 @@ export default function Team() {
           isLoading={createMutation.isPending}
         />
 
-        {/* People Data Type Modal */}
-        <PeopleDataTypeModal
-          open={isTypeModalOpen}
-          onOpenChange={handleTypeModalClose}
-          fileName={pendingFile?.name || ''}
-          fileType={pendingFile?.type || ''}
-          collaborators={collaborators.map(c => ({ id: c.id, name: c.name }))}
-          onSubmit={handleProcessPeopleData}
+        {/* Batch Upload Modal */}
+        <PeopleDataBatchModal
+          open={isBatchModalOpen}
+          files={pendingFiles}
+          projectId={currentProject.id}
+          onProcessFiles={handleBatchProcess}
+          onCancel={handleBatchCancel}
           isProcessing={isProcessingFile}
+          currentProcessingIndex={currentProcessingIndex}
         />
       </div>
     </AppLayout>

@@ -25,7 +25,7 @@ export function PeopleDataUploadZone({ onFilesSelected, disabled }: PeopleDataUp
       'text/csv': ['.csv'],
     },
     disabled,
-    multiple: false,
+    multiple: true,
   });
 
   return (
@@ -53,7 +53,7 @@ export function PeopleDataUploadZone({ onFilesSelected, disabled }: PeopleDataUp
             <div className="space-y-1">
               <p className="font-medium">Upload de Dados de Pessoas</p>
               <p className="text-sm text-muted-foreground">
-                Arraste ou clique para selecionar
+                Arraste arquivos ou clique para selecionar (múltiplos)
               </p>
             </div>
             
