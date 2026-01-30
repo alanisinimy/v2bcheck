@@ -6,6 +6,23 @@ export type EvidenceStatus = 'pendente' | 'validado' | 'rejeitado' | 'investigar
 
 export type AssetStatus = 'uploading' | 'processing' | 'completed' | 'error';
 
+export type SourceType = 
+  | 'entrevista_diretoria'
+  | 'entrevista_operacao'
+  | 'reuniao_kickoff'
+  | 'reuniao_vendas'
+  | 'briefing'
+  | 'documentacao';
+
+export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> = {
+  entrevista_diretoria: { label: 'Entrevista (CEO/Diretoria)', icon: '🎤' },
+  entrevista_operacao: { label: 'Entrevista (Time/Operação)', icon: '👥' },
+  reuniao_kickoff: { label: 'Reunião de Kick-off', icon: '🚀' },
+  reuniao_vendas: { label: 'Reunião de Vendas (Gravada)', icon: '📞' },
+  briefing: { label: 'Briefing / Formulário', icon: '📝' },
+  documentacao: { label: 'Documentação Técnica', icon: '📄' },
+};
+
 export interface Project {
   id: string;
   name: string;
@@ -24,6 +41,7 @@ export interface Asset {
   file_size: number;
   storage_path: string;
   status: AssetStatus;
+  source_type?: SourceType;
   duration_seconds?: number;
   metadata?: Record<string, unknown>;
   created_at: string;

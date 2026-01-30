@@ -4,12 +4,19 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { FileUploadZone } from '@/components/vault/FileUploadZone';
 import { AssetCard } from '@/components/vault/AssetCard';
+import { SourceTypeModal } from '@/components/vault/SourceTypeModal';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useAssets, useDeleteAsset } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
 import { analyzeEvidences, extractTextFromFile } from '@/hooks/useAnalyzeEvidences';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import type { SourceType } from '@/lib/types';
+
+interface PendingFile {
+  file: File;
+  sourceType?: SourceType;
+}
 
 export default function Vault() {
   const { currentProject, isLoading: isLoadingProject } = useProjectContext();
@@ -21,19 +28,28 @@ export default function Vault() {
   const [isUploading, setIsUploading] = useState(false);
   const [processingMessage, setProcessingMessage] = useState<string | null>(null);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
+  
+  // Classification modal state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [classifiedFiles, setClassifiedFiles] = useState<PendingFile[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleFilesSelected = useCallback(async (files: File[]) => {
+  const processFiles = useCallback(async (files: PendingFile[]) => {
     if (!currentProject) return;
     
     setIsUploading(true);
     
-    for (const file of files) {
+    for (const { file, sourceType } of files) {
+      if (!sourceType) continue;
+      
       try {
         // Step 1: Upload file to storage and create asset record
         setProcessingMessage(`Enviando ${file.name}...`);
         const asset = await uploadAssetMutation.mutateAsync({
           projectId: currentProject.id,
           file,
+          sourceType,
         });
 
         toast({
@@ -53,7 +69,8 @@ export default function Vault() {
             projectId: currentProject.id,
             assetId: asset.id,
             content: textContent,
-            sourceDescription: `Arquivo: ${file.name}`,
+            sourceDescription: file.name,
+            sourceType,
           });
 
           if (result.error) {
@@ -113,6 +130,41 @@ export default function Vault() {
     setProcessingMessage(null);
   }, [currentProject, uploadAssetMutation, updateStatusMutation, queryClient]);
 
+  const handleFilesSelected = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+    
+    // Start classification flow
+    setPendingFiles(files);
+    setCurrentFileIndex(0);
+    setClassifiedFiles([]);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleSourceTypeConfirm = useCallback((sourceType: SourceType) => {
+    const currentFile = pendingFiles[currentFileIndex];
+    const newClassified = [...classifiedFiles, { file: currentFile, sourceType }];
+    
+    if (currentFileIndex < pendingFiles.length - 1) {
+      // More files to classify
+      setClassifiedFiles(newClassified);
+      setCurrentFileIndex(currentFileIndex + 1);
+    } else {
+      // All files classified, start processing
+      setIsModalOpen(false);
+      setPendingFiles([]);
+      setCurrentFileIndex(0);
+      setClassifiedFiles([]);
+      processFiles(newClassified);
+    }
+  }, [pendingFiles, currentFileIndex, classifiedFiles, processFiles]);
+
+  const handleSourceTypeCancel = useCallback(() => {
+    setIsModalOpen(false);
+    setPendingFiles([]);
+    setCurrentFileIndex(0);
+    setClassifiedFiles([]);
+  }, []);
+
   const handleDeleteAsset = useCallback(async (assetId: string, storagePath: string) => {
     if (!currentProject) return;
     
@@ -142,6 +194,7 @@ export default function Vault() {
   }, [currentProject, deleteAssetMutation]);
 
   const isLoading = isLoadingProject || isLoadingAssets;
+  const currentFileName = pendingFiles[currentFileIndex]?.name || '';
 
   // Show loading state
   if (isLoading) {
@@ -183,6 +236,14 @@ export default function Vault() {
         <FileUploadZone 
           onFilesSelected={handleFilesSelected}
           isUploading={isUploading}
+        />
+
+        {/* Source Type Classification Modal */}
+        <SourceTypeModal
+          isOpen={isModalOpen}
+          fileName={currentFileName}
+          onConfirm={handleSourceTypeConfirm}
+          onCancel={handleSourceTypeCancel}
         />
 
         {/* Processing Message */}

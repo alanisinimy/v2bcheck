@@ -1,11 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Pilar } from '@/lib/types';
+import type { Pilar, SourceType } from '@/lib/types';
+import { SOURCE_TYPES } from '@/lib/types';
 
 interface AnalyzeEvidencesParams {
   projectId: string;
   assetId: string;
   content: string;
   sourceDescription: string;
+  sourceType: SourceType;
 }
 
 interface ExtractedEvidence {
@@ -45,8 +47,12 @@ export async function analyzeEvidences({
   assetId,
   content,
   sourceDescription,
+  sourceType,
 }: AnalyzeEvidencesParams): Promise<AnalyzeResult> {
   try {
+    // Format source description with source type
+    const sourceConfig = SOURCE_TYPES[sourceType];
+    const formattedSource = `${sourceConfig.icon} ${sourceConfig.label} • ${sourceDescription}`;
     // Call the Edge Function
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
       body: { content }
@@ -82,7 +88,7 @@ export async function analyzeEvidences({
       asset_id: assetId,
       pilar: ev.pilar,
       content: ev.content,
-      source_description: sourceDescription,
+      source_description: formattedSource,
       status: 'pendente' as const,
       is_divergence: ev.is_divergence || false,
       divergence_description: ev.divergence_description || null,

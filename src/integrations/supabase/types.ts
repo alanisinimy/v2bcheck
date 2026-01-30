@@ -24,6 +24,7 @@ export type Database = {
           id: string
           metadata: Json | null
           project_id: string
+          source_type: Database["public"]["Enums"]["source_type"] | null
           status: Database["public"]["Enums"]["asset_status"]
           storage_path: string
           updated_at: string
@@ -37,6 +38,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           project_id: string
+          source_type?: Database["public"]["Enums"]["source_type"] | null
           status?: Database["public"]["Enums"]["asset_status"]
           storage_path: string
           updated_at?: string
@@ -50,6 +52,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           project_id?: string
+          source_type?: Database["public"]["Enums"]["source_type"] | null
           status?: Database["public"]["Enums"]["asset_status"]
           storage_path?: string
           updated_at?: string
@@ -171,6 +174,13 @@ export type Database = {
       asset_status: "uploading" | "processing" | "completed" | "error"
       evidence_status: "pendente" | "validado" | "rejeitado" | "investigar"
       pilar: "pessoas" | "processos" | "dados" | "tecnologia" | "gestao"
+      source_type:
+        | "entrevista_diretoria"
+        | "entrevista_operacao"
+        | "reuniao_kickoff"
+        | "reuniao_vendas"
+        | "briefing"
+        | "documentacao"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -301,6 +311,14 @@ export const Constants = {
       asset_status: ["uploading", "processing", "completed", "error"],
       evidence_status: ["pendente", "validado", "rejeitado", "investigar"],
       pilar: ["pessoas", "processos", "dados", "tecnologia", "gestao"],
+      source_type: [
+        "entrevista_diretoria",
+        "entrevista_operacao",
+        "reuniao_kickoff",
+        "reuniao_vendas",
+        "briefing",
+        "documentacao",
+      ],
     },
   },
 } as const
