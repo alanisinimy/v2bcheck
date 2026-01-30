@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import OpenAI from "https://deno.land/x/openai@v4.28.0/mod.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,7 +20,7 @@ REGRAS:
 - Classifique cada evidência corretamente no pilar apropriado
 - Extraia TODAS as evidências relevantes do texto`;
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -46,58 +45,71 @@ serve(async (req) => {
     console.log('Calling OpenAI API to analyze content...');
     console.log('Content length:', content.length);
 
-    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Analise este texto e extraia as evidências:\n\n${content}` }
-      ],
-      temperature: 0.2,
-      tools: [
-        {
-          type: 'function',
-          function: {
-            name: 'extract_evidences',
-            description: 'Extraia evidências estruturadas do texto analisado',
-            parameters: {
-              type: 'object',
-              properties: {
-                evidences: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      content: { 
-                        type: 'string',
-                        description: 'Descrição clara e factual da evidência em pt-BR'
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `Analise este texto e extraia as evidências:\n\n${content}` }
+        ],
+        temperature: 0.2,
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_evidences',
+              description: 'Extraia evidências estruturadas do texto analisado',
+              parameters: {
+                type: 'object',
+                properties: {
+                  evidences: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        content: { 
+                          type: 'string',
+                          description: 'Descrição clara e factual da evidência em pt-BR'
+                        },
+                        pilar: { 
+                          type: 'string', 
+                          enum: ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'],
+                          description: 'O pilar ao qual a evidência pertence'
+                        },
+                        is_divergence: { 
+                          type: 'boolean',
+                          description: 'Se há contradição explícita no texto'
+                        },
+                        divergence_description: { 
+                          type: 'string',
+                          description: 'Explicação da divergência, se aplicável'
+                        }
                       },
-                      pilar: { 
-                        type: 'string', 
-                        enum: ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'],
-                        description: 'O pilar ao qual a evidência pertence'
-                      },
-                      is_divergence: { 
-                        type: 'boolean',
-                        description: 'Se há contradição explícita no texto'
-                      },
-                      divergence_description: { 
-                        type: 'string',
-                        description: 'Explicação da divergência, se aplicável'
-                      }
-                    },
-                    required: ['content', 'pilar', 'is_divergence']
+                      required: ['content', 'pilar', 'is_divergence']
+                    }
                   }
-                }
-              },
-              required: ['evidences']
+                },
+                required: ['evidences']
+              }
             }
           }
-        }
-      ],
-      tool_choice: { type: 'function', function: { name: 'extract_evidences' } }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_evidences' } }
+      }),
     });
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error('Failed to analyze content');
+    }
+
+    const completion = await openaiResponse.json();
 
     console.log('OpenAI response received');
 
