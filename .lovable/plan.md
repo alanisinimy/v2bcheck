@@ -1,203 +1,224 @@
 
-# Plano: Implementar Feature "Role Fit" (Adequacao ao Cargo)
+
+# Plano: Implementar "Auto-Fill Context" (Preenchimento Inteligente)
 
 ## Resumo
 
-Adicionar a funcionalidade de analise de adequacao do perfil DISC ao cargo especifico do colaborador. Isso permite refinar cargos genericos como "Comercial" para funcoes especificas (SDR, Closer, etc.) e obter uma analise de compatibilidade comportamental.
+Criar funcionalidade que analisa automaticamente todas as transcrições/reuniões do projeto para extrair e preencher os campos de contexto na aba "Visão Geral". Isso evita que o Plano Estratégico faça sugestões genéricas (ex: "implementar CRM" quando o cliente já usa HubSpot).
 
-## Arquitetura da Solucao
-
-```text
-+-------------------+      +----------------------+      +------------------+
-|  CollaboratorCard |----->| analyze-role-fit     |----->| Supabase DB      |
-|  (editar cargo)   |      | (Edge Function)      |      | (role_fit_level, |
-+-------------------+      +----------------------+      |  role_fit_reason)|
-                                   |                     +------------------+
-                                   v
-                           +--------------+
-                           | OpenAI API   |
-                           | (gpt-4o-mini)|
-                           +--------------+
-```
-
-## Mudancas no Banco de Dados
-
-Adicionar 2 novas colunas na tabela `collaborators`:
-
-```sql
-ALTER TABLE public.collaborators
-ADD COLUMN role_fit_level TEXT CHECK (role_fit_level IN ('alto', 'medio', 'baixo')),
-ADD COLUMN role_fit_reason TEXT;
-```
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| role_fit_level | TEXT | Nivel de fit: 'alto', 'medio', 'baixo' ou null |
-| role_fit_reason | TEXT | Justificativa da IA sobre o fit |
-
-## Modificacoes nos Arquivos
-
-### 1. Hook `useCollaborators.ts`
-
-**Adicionar:**
-- Campos `role_fit_level` e `role_fit_reason` na interface `Collaborator`
-- Novo hook `useAnalyzeRoleFit()` para chamar a edge function
-
-```typescript
-export interface Collaborator {
-  // ... campos existentes
-  role_fit_level: 'alto' | 'medio' | 'baixo' | null;
-  role_fit_reason: string | null;
-}
-
-export function useAnalyzeRoleFit() {
-  // Chama supabase.functions.invoke('analyze-role-fit')
-  // Invalida cache apos sucesso
-}
-```
-
-### 2. Componente `CollaboratorCard.tsx`
-
-**Modificacoes:**
-- Tornar o campo de cargo editavel (inline editing)
-- Adicionar badge de Role Fit com cores semanticas
-- Adicionar botao "Recalcular Analise"
-- Exibir justificativa abaixo do badge
+## Arquitetura da Solução
 
 ```text
-+----------------------------------------+
-| TATIANE RODRIGUES        [PDF Auto]    |
-| [SDR ▼] <-- Select editavel            |
-+----------------------------------------+
-| D ████████░░  75                       |
-| I ██░░░░░░░░  25                       |
-| S ██░░░░░░░░  20                       |
-| C █████████░  85                       |
-+----------------------------------------+
-| [C] Alto C - Analitico                 |
-+----------------------------------------+
-| [🟢 Fit Alto] [🔄 Recalcular]          |
-| O perfil Analitico favorece...         |
-+----------------------------------------+
-| [🗑️]                                   |
-+----------------------------------------+
++------------------------+      +-------------------------+      +----------------+
+| ProjectOverviewForm    |----->| extract-project-context |----->| projects table |
+| "Extrair das Reuniões" |      | (Edge Function)         |      | client_context |
++------------------------+      +-------------------------+      | main_pain_points|
+                                        |                        | project_goals  |
+                                        v                        +----------------+
+                                +---------------+
+                                | Storage       |
+                                | (arquivos txt)|
+                                +---------------+
+                                        |
+                                        v
+                                +---------------+
+                                | OpenAI API    |
+                                | (gpt-4o-mini) |
+                                +---------------+
 ```
 
-**Componentes de UI:**
-- `RoleFitBadge`: Badge colorido (verde/amarelo/vermelho)
-- `RoleSelector`: Select/Combobox com opcoes de cargo
-- Botao de recalcular com loading state
+## Fluxo de Usuario
 
-### 3. Nova Edge Function `analyze-role-fit/index.ts`
+1. Usuario vai para Dashboard > Aba "Visão Geral"
+2. Clica no botão "Extrair Contexto das Reuniões"
+3. Sistema exibe loading: "Analisando transcrições..."
+4. Edge function busca todos os arquivos de texto do projeto
+5. IA extrai contexto, stack tecnológico e dores latentes
+6. Campos são preenchidos automaticamente na tela
+7. Usuario pode revisar e clicar em "Salvar Alterações"
 
-**Endpoint:** `POST /analyze-role-fit`
+## Modificações nos Arquivos
+
+### 1. Nova Edge Function `extract-project-context/index.ts`
+
+**Endpoint:** `POST /extract-project-context`
 
 **Input:**
 ```json
 {
-  "collaboratorId": "uuid",
-  "collaboratorName": "Tatiane",
-  "role": "SDR",
-  "discProfile": { "dom": 75, "inf": 25, "est": 20, "conf": 85 }
+  "projectId": "uuid"
+}
+```
+
+**Lógica:**
+1. Buscar assets do projeto (source_type != 'perfil_disc', status = 'completed')
+2. Para cada asset .txt, baixar conteúdo do Storage
+3. Concatenar todos os textos (limite de tokens)
+4. Enviar para GPT-4o-mini com prompt de Auditor
+
+**Prompt do Especialista:**
+```text
+Você é um Auditor Sênior de Diagnóstico Comercial.
+
+Leia todas as transcrições de reuniões deste projeto e extraia 
+um resumo executivo para preencher 3 campos:
+
+1. CONTEXTO DA EMPRESA:
+   - O que a empresa faz
+   - Tempo de mercado / tamanho do time
+   - Modelo de venda (Inside Sales, Field Sales, PLG)
+   - Segmento e ticket médio
+
+2. STACK TECNOLÓGICO & PROCESSOS:
+   - Liste TODAS as ferramentas citadas (CRM, ERP, planilhas)
+   - Como cada ferramenta é usada atualmente
+   - Integrações existentes
+   - Ferramentas que estão sendo avaliadas/desejadas
+
+3. DORES LATENTES:
+   - Problemas citados repetidamente
+   - Frustrações do time
+   - Gaps identificados
+   - Metas não atingidas
+
+REGRA CRÍTICA: Seja factual. Extraia apenas o que foi 
+explicitamente dito nas transcrições.
+
+Responda em JSON:
+{
+  "client_context": "Texto resumido do contexto...",
+  "main_pain_points": "Lista de dores...",
+  "project_goals": "Objetivos inferidos..."
 }
 ```
 
 **Output:**
 ```json
 {
-  "role_fit_level": "alto",
-  "role_fit_reason": "O perfil Analitico (Alto C) favorece a disciplina..."
+  "client_context": "Empresa de tecnologia B2B com 50 funcionários, 8 anos de mercado. Utiliza HubSpot como CRM principal...",
+  "main_pain_points": "Time não preenche o CRM consistentemente. Forecast impreciso. Alta rotatividade de SDRs...",
+  "project_goals": "Aumentar previsibilidade do pipeline. Melhorar adoção do CRM. Reduzir turnover."
 }
 ```
 
-**Prompt do Especialista:**
-```text
-Voce e um especialista em Gestao de Talentos em Vendas B2B.
+### 2. Novo Hook `useExtractContext.ts`
 
-REGRAS DE OURO POR CARGO:
-- SDR/BDR: Beneficia-se de C (Processo) e D (Resultado) ou S (Constancia). 
-  Alto I pode ser ruim (perde foco em tarefas repetitivas).
-- Closer/AE: Beneficia-se de Alto D (Fechamento) e Alto I (Influencia). 
-  Alto C pode travar a negociacao.
-- Farmer/CS: Beneficia-se de Alto S (Relacionamento) e Alto I (Empatia).
-- Gerente: Precisa de D (Lideranca) + equilibrio para gerenciar perfis diversos.
-- BDR Outbound: Alto D e C (metodico e assertivo).
-
-TAREFA:
-Analise se o perfil DISC de [Nome] e adequado para o cargo [Cargo].
-
-PERFIL:
-- D (Dominancia): X%
-- I (Influencia): Y%
-- S (Estabilidade): Z%
-- C (Conformidade): W%
-
-Responda em JSON:
-{
-  "fit_level": "alto" | "medio" | "baixo",
-  "reason": "Justificativa em 1-2 frases focando no impacto pratico"
+```typescript
+export function useExtractContext() {
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const { data, error } = await supabase.functions.invoke(
+        'extract-project-context',
+        { body: { projectId } }
+      );
+      if (error || data.error) throw new Error(data?.error || error.message);
+      return data;
+    },
+  });
 }
 ```
 
-### 4. Pagina `Team.tsx`
+### 3. Atualizar `ProjectOverviewForm.tsx`
 
 **Adicionar:**
-- Handler `handleUpdateRole` para salvar cargo editado
-- Handler `handleAnalyzeRoleFit` para chamar a edge function
-- Estado `analyzingFitId` para loading
+- Botão "Extrair Contexto das Reuniões" no topo do form
+- Estado de loading com mensagem "Analisando transcrições..."
+- Após sucesso, preencher os 3 campos e mostrar toast
+- Manter mudanças como "não salvas" para usuário revisar
+
+**Layout:**
+```text
++--------------------------------------------------+
+| [✨ Extrair Contexto das Reuniões]               |
++--------------------------------------------------+
+|                                                  |
+| 🏢 Contexto da Empresa                           |
+| [textarea preenchida automaticamente]            |
+|                                                  |
+| ⚠️ Dores Latentes                                |
+| [textarea preenchida automaticamente]            |
+|                                                  |
+| 🎯 Objetivos do Projeto                          |
+| [textarea preenchida automaticamente]            |
+|                                                  |
+|                        [Salvar Alterações]       |
++--------------------------------------------------+
+```
+
+### 4. Atualizar `generate-strategic-plan/index.ts`
+
+**Adicionar:**
+1. Buscar dados da tabela `projects` (client_context, main_pain_points, project_goals)
+2. Incluir no prompt como "CONTEXTO OBRIGATÓRIO"
+3. Adicionar regra de não duplicar ferramentas existentes
+
+**Novo trecho do prompt:**
+```text
+CONTEXTO OBRIGATÓRIO DA EMPRESA:
+${project.client_context || 'Não informado'}
+
+STACK TECNOLÓGICO EXISTENTE:
+${project.main_pain_points || 'Não informado'}
+
+REGRA CRÍTICA: Se o contexto menciona que a empresa JÁ USA uma 
+ferramenta (ex: HubSpot, Salesforce), NUNCA sugira "Implementar" 
+ou "Comprar". Sugira:
+- "Auditoria de [Ferramenta]"
+- "Otimização de [Ferramenta]"  
+- "Treinamento de [Ferramenta]"
+```
 
 ### 5. Atualizar `supabase/config.toml`
 
-Adicionar configuracao da nova edge function:
-
 ```toml
-[functions.analyze-role-fit]
+[functions.extract-project-context]
 verify_jwt = false
 ```
 
-## Lista de Cargos Predefinidos
+## Tratamento de Casos Especiais
 
-Para o seletor de cargo, usar opcoes comuns em vendas B2B:
-
-| Cargo | Descricao |
-|-------|-----------|
-| SDR | Sales Development Representative |
-| BDR | Business Development Representative |
-| Closer | Account Executive / Closer |
-| Farmer | Customer Success / Account Manager |
-| Gerente | Sales Manager |
-| Diretor | Sales Director |
-| Consultor | Sales Consultant |
-| Outro | Cargo customizado |
-
-## Fluxo de Usuario
-
-1. Usuario vai para aba "Time"
-2. Clica no cargo atual (ex: "Comercial")
-3. Seleciona novo cargo (ex: "SDR") no dropdown
-4. Sistema salva e chama automaticamente `analyze-role-fit`
-5. Badge de fit aparece com cor apropriada
-6. Usuario pode clicar em "Recalcular" se quiser nova analise
+| Cenário | Comportamento |
+|---------|---------------|
+| Nenhum arquivo de texto | Mostrar toast: "Nenhuma transcrição encontrada. Faça upload de reuniões no Vault." |
+| Arquivos muito grandes | Truncar para ~50.000 caracteres (limite de contexto) |
+| Campos já preenchidos | Confirmar se usuário quer sobrescrever |
+| Erro na API | Toast de erro, manter campos anteriores |
 
 ## Secao Tecnica
 
-### Ordem de Implementacao
+### Ordem de Implementação
 
-1. Migracao SQL (adicionar colunas)
-2. Atualizar `useCollaborators.ts` (interface + hook)
-3. Criar edge function `analyze-role-fit`
-4. Atualizar `CollaboratorCard.tsx` (UI completa)
-5. Atualizar `Team.tsx` (handlers)
-6. Atualizar `config.toml`
+1. Criar edge function `extract-project-context`
+2. Atualizar `supabase/config.toml`
+3. Criar hook `useExtractContext.ts`
+4. Atualizar `ProjectOverviewForm.tsx` (UI + integração)
+5. Atualizar `generate-strategic-plan` (usar contexto no prompt)
 
-### Dependencias
+### Dependências
 
-- Nenhuma nova dependencia necessaria
-- Reutiliza componentes UI existentes (Badge, Select, Button)
-- Reutiliza padroes de edge functions existentes
+- Nenhuma nova dependência
+- Reutiliza cliente Supabase para Storage
+- Reutiliza padrões de edge functions existentes
 
-### Tratamento de Erros
+### Acesso ao Storage na Edge Function
 
-- Se analise falhar: toast de erro, limpar estado de loading
-- Se cargo for "Outro": permitir input customizado
-- Se perfil DISC nao existir: desabilitar analise de fit
+```typescript
+// Baixar arquivo do Storage
+const { data: fileData, error: downloadError } = await supabase
+  .storage
+  .from('project-files')
+  .download(asset.storage_path);
+
+if (!downloadError && fileData) {
+  const text = await fileData.text();
+  allContent += text + '\n\n---\n\n';
+}
+```
+
+### Limite de Tokens
+
+Para evitar exceder o contexto do modelo:
+- Concatenar no máximo 50.000 caracteres
+- Priorizar arquivos mais recentes (ordenar por created_at DESC)
+- Pular arquivos binários (apenas .txt, .md, .csv)
+
