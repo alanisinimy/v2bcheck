@@ -29,6 +29,8 @@ const sourceTypeOptions: SourceType[] = [
   'entrevista_operacao',
   'reuniao_kickoff',
   'reuniao_vendas',
+  'reuniao_diagnostico',
+  'reuniao_planejamento',
   'briefing',
   'documentacao',
   'perfil_disc',
