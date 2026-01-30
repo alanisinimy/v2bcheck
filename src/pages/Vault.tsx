@@ -5,7 +5,7 @@ import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { FileUploadZone } from '@/components/vault/FileUploadZone';
 import { AssetCard } from '@/components/vault/AssetCard';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useAssets } from '@/hooks/useProject';
+import { useAssets, useDeleteAsset } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
 import { analyzeEvidences, extractTextFromFile } from '@/hooks/useAnalyzeEvidences';
 import { toast } from '@/hooks/use-toast';
@@ -16,9 +16,11 @@ export default function Vault() {
   const { data: assets = [], isLoading: isLoadingAssets } = useAssets(currentProject?.id);
   const uploadAssetMutation = useUploadAsset();
   const updateStatusMutation = useUpdateAssetStatus();
+  const deleteAssetMutation = useDeleteAsset();
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const [processingMessage, setProcessingMessage] = useState<string | null>(null);
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
 
   const handleFilesSelected = useCallback(async (files: File[]) => {
     if (!currentProject) return;
@@ -111,6 +113,34 @@ export default function Vault() {
     setProcessingMessage(null);
   }, [currentProject, uploadAssetMutation, updateStatusMutation, queryClient]);
 
+  const handleDeleteAsset = useCallback(async (assetId: string, storagePath: string) => {
+    if (!currentProject) return;
+    
+    setDeletingAssetId(assetId);
+    
+    try {
+      await deleteAssetMutation.mutateAsync({
+        assetId,
+        storagePath,
+        projectId: currentProject.id,
+      });
+      
+      toast({
+        title: 'Arquivo excluído',
+        description: 'O arquivo e suas evidências foram removidos.',
+      });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir o arquivo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingAssetId(null);
+    }
+  }, [currentProject, deleteAssetMutation]);
+
   const isLoading = isLoadingProject || isLoadingAssets;
 
   // Show loading state
@@ -182,7 +212,13 @@ export default function Vault() {
           
           <div className="space-y-3">
             {assets.map((asset, index) => (
-              <AssetCard key={asset.id} asset={asset} index={index} />
+              <AssetCard 
+                key={asset.id} 
+                asset={asset} 
+                index={index}
+                onDelete={handleDeleteAsset}
+                isDeleting={deletingAssetId === asset.id}
+              />
             ))}
           </div>
 
