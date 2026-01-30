@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Building2, Target, AlertCircle } from 'lucide-react';
+import { Save, Building2, Target, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useUpdateProject } from '@/hooks/useUpdateProject';
+import { useExtractContext } from '@/hooks/useExtractContext';
 import { toast } from '@/hooks/use-toast';
 import type { Project } from '@/lib/types';
 
@@ -18,6 +19,7 @@ export function ProjectOverviewForm({ project }: ProjectOverviewFormProps) {
   const [projectGoals, setProjectGoals] = useState(project.project_goals || '');
   
   const updateProjectMutation = useUpdateProject();
+  const extractContextMutation = useExtractContext();
 
   // Sync state when project changes
   useEffect(() => {
@@ -53,6 +55,28 @@ export function ProjectOverviewForm({ project }: ProjectOverviewFormProps) {
     }
   };
 
+  const handleExtractContext = async () => {
+    try {
+      const result = await extractContextMutation.mutateAsync(project.id);
+      
+      // Update local state with extracted values
+      setClientContext(result.client_context);
+      setMainPainPoints(result.main_pain_points);
+      setProjectGoals(result.project_goals);
+      
+      toast({
+        title: 'Contexto extraído',
+        description: `${result.stats.filesProcessed} arquivo(s) analisado(s). Revise e salve as alterações.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro na extração',
+        description: error instanceof Error ? error.message : 'Não foi possível extrair o contexto.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -60,6 +84,41 @@ export function ProjectOverviewForm({ project }: ProjectOverviewFormProps) {
       transition={{ duration: 0.4 }}
       className="space-y-6"
     >
+      {/* Extract Context Button */}
+      <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-4 border border-primary/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/20">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground">Preenchimento Inteligente</p>
+              <p className="text-sm text-muted-foreground">
+                Analisa as transcrições do Vault e preenche os campos automaticamente
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleExtractContext}
+            disabled={extractContextMutation.isPending}
+            variant="default"
+            className="gap-2"
+          >
+            {extractContextMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Analisando...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Extrair das Reuniões
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
       {/* Client Context */}
       <div className="bg-card rounded-2xl p-6 border border-border/50 shadow-soft">
         <div className="flex items-center gap-3 mb-4">
