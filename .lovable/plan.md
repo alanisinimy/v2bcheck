@@ -1,286 +1,209 @@
 
 
-# Plano: Upgrade de Inteligência do Sistema de Evidências
+# Plano: Reforçar Filtro Anti-Consultoria
 
-**Status: ✅ IMPLEMENTADO**
+## Problema Identificado
 
-## Resumo
+A IA ainda extrai evidências sobre o trabalho da Vendas to Be/V2B porque:
 
-Três melhorias críticas implementadas no sistema de extração de evidências:
+1. LLMs respondem melhor a instruções **positivas** do que listas de exclusão
+2. Não há **validação pós-extração** para capturar evidências que escapam
+3. Variações de nome ("Vendas to Be" vs "Vendas2B") podem confundir
 
-1. ✅ **O Cérebro**: A IA lê o contexto do colaborador (DISC, histórico) antes de analisar seus arquivos
-2. ✅ **O Filtro**: Regras de exclusão para ignorar conversas sobre a consultoria Vendas2B
-3. ✅ **A Faxina**: Botão para consolidar evidências duplicadas semanticamente
-
-## Arquitetura da Solução
+## Solução em 3 Camadas
 
 ```text
-+------------------+     +----------------------+     +-------------------+
-| Vault (Upload)   |---->| analyze-evidences    |---->| evidences table   |
-| collaborator_id  |     | + Contexto DISC      |     | (filtradas)       |
-+------------------+     | + Blacklist Vendas2B |     +-------------------+
-                         +----------------------+
-                                                      
-+------------------+     +----------------------+     +-------------------+
-| Matriz           |---->| consolidate-evidences|---->| evidences table   |
-| "Consolidar"     |     | (LLM semântico)      |     | (dedupadas)       |
-+------------------+     +----------------------+     +-------------------+
+CAMADA 1: PROMPT REFORÇADO
++----------------------------------+
+| "ANTES de extrair, pergunte:    |
+|  Esta frase é sobre o CLIENTE?" |
++----------------------------------+
+           ↓
+CAMADA 2: VALIDAÇÃO NO TOOL CALL
++----------------------------------+
+| Campo obrigatório:               |
+| is_about_client: boolean         |
+| (IA deve marcar explicitamente) |
++----------------------------------+
+           ↓
+CAMADA 3: FILTRO PÓS-EXTRAÇÃO
++----------------------------------+
+| Regex/keywords no backend para  |
+| capturar evidências que escapam |
++----------------------------------+
 ```
 
-## Parte 1: O Cérebro - Contexto do Colaborador
+## Mudanças Técnicas
 
-### Modificar `analyze-evidences/index.ts`
+### 1. Reformular o Prompt (Abordagem Positiva)
 
-**Novo fluxo:**
+Em vez de uma lista de "não faça", usar perguntas de validação:
 
-1. Receber `collaboratorId` opcional na requisição
-2. Se presente, buscar do banco:
-   - Dados do colaborador (`name`, `role`, `disc_profile`)
-   - Últimas 5 evidências validadas vinculadas a ele
-3. Injetar contexto no System Prompt
-
-**Novo Input:**
-```json
-{
-  "content": "texto do arquivo",
-  "collaboratorId": "uuid-opcional"
-}
-```
-
-**Contexto injetado no prompt:**
+**Antes (Negativo):**
 ```text
-CONTEXTO DO COLABORADOR:
-Você está analisando um arquivo de [Tatiane Rodrigues].
-Cargo: [SDR]
-Perfil Comportamental DISC: D=45, I=78, S=32, C=55 (Perfil Alto I - Comunicadora)
-
-O QUE JÁ SABEMOS SOBRE ELA:
-- Mencionou dificuldade com follow-up no CRM
-- Reclama que metas são irreais
-- Prefere ligações a emails
-- Tem alta taxa de agendamento mas baixa conversão
-- Resiste a usar scripts padronizados
-
-INSTRUÇÃO ESPECIAL: 
-Cruze novas informações com o perfil DISC. Se ela reclama de algo,
-verifique se confirma uma característica do perfil (ex: Alto I resiste a processos rígidos).
+IGNORE A CONSULTORIA:
+- Qualquer menção a "Vendas2B"...
 ```
 
-### Modificar `useAnalyzeEvidences.ts`
+**Depois (Positivo + Validação):**
+```text
+TESTE DE RELEVÂNCIA (aplique a CADA frase antes de extrair):
 
-Passar `collaboratorId` para a Edge Function:
+Pergunta 1: "Esta informação descreve algo que o CLIENTE faz, sente ou possui?"
+- SIM → Pode ser evidência
+- NÃO → DESCARTE
+
+Pergunta 2: "Esta frase menciona trabalho FUTURO da consultoria?"
+- SIM → DESCARTE (escopo de projeto, não evidência)
+- NÃO → Continue
+
+Pergunta 3: "O sujeito da frase é um consultor externo (Luana, João, Emília, Vendas2B)?"
+- SIM → DESCARTE
+- NÃO → EXTRAIA
+```
+
+### 2. Adicionar Campo de Validação no Tool Call
+
+Forçar a IA a declarar explicitamente se é sobre o cliente:
 
 ```typescript
-const { data, error } = await supabase.functions.invoke('analyze-evidences', {
-  body: { content, collaboratorId }
-});
-```
-
-### Modificar `Vault.tsx`
-
-Buscar o `collaborator_id` do asset criado e passá-lo para `analyzeEvidences()`.
-
-## Parte 2: O Filtro - Blacklist da Consultoria
-
-### Atualizar System Prompt em `analyze-evidences`
-
-Adicionar regras de exclusão no início:
-
-```text
-REGRAS DE EXCLUSÃO (BLACKLIST) - IGNORE COMPLETAMENTE:
-
-1. IGNORE A CONSULTORIA:
-   - Qualquer menção a "Vendas2B", "Vendas to Be", "Vendas 2 Be"
-   - Frases como "Nós da consultoria vamos...", "Nosso diagnóstico vai..."
-   - Promessas futuras da consultoria ("Vamos implementar", "Vamos fazer")
-   - Escopo de projeto ou metodologia da consultoria
-
-2. IGNORE OS CONSULTORES:
-   - Ações atribuídas a consultores (Luana, João, Emília, ou quem conduz a reunião)
-   - Perguntas dos consultores (são contexto, não evidência)
-   - Explicações sobre a metodologia de trabalho
-
-3. FOCO EXCLUSIVO NO CLIENTE:
-   - Extraia APENAS fatos, dores e processos da empresa cliente (Blueprintt)
-   - Se a frase fala sobre o que a consultoria vai fazer, DESCARTE
-   - Se a frase fala sobre o que o CLIENTE faz/sente/sofre, EXTRAIA
-
-EXEMPLOS DE DESCARTE:
-- ❌ "A Vendas2B vai mapear todos os processos" (escopo de projeto)
-- ❌ "Luana perguntou sobre o CRM" (ação do consultor)
-- ❌ "Vamos entregar um dashboard personalizado" (promessa futura)
-
-EXEMPLOS DE EXTRAÇÃO:
-- ✅ "O time não preenche o CRM por falta de tempo" (dor do cliente)
-- ✅ "A meta é de 30 reuniões por mês" (dado factual)
-- ✅ "Usamos o HubSpot desde 2022" (tecnologia do cliente)
-```
-
-## Parte 3: A Faxina - Consolidação de Evidências
-
-### Nova Edge Function `consolidate-evidences/index.ts`
-
-**Input:**
-```json
-{
-  "projectId": "uuid"
+properties: {
+  content: { type: 'string' },
+  pilar: { type: 'string', enum: [...] },
+  is_about_client: { 
+    type: 'boolean',
+    description: 'TRUE se a evidência é sobre o cliente. FALSE se menciona a consultoria/escopo futuro.'
+  },
+  // ... outros campos
 }
 ```
 
-**Lógica:**
+### 3. Filtro Pós-Extração no Backend
 
-1. Buscar todas as evidências com status `pendente` ou `validado`
-2. Agrupar por pilar para reduzir contexto
-3. Enviar para LLM com instrução de consolidação
-4. Atualizar status das redundantes para `rejeitado`
-5. Retornar contagem de consolidações
+Adicionar validação depois que a IA retorna:
 
-**Prompt de Consolidação:**
+```typescript
+// Palavras-chave que indicam evidência sobre consultoria
+const CONSULTANCY_KEYWORDS = [
+  'vendas2b', 'vendas to be', 'vendas 2 be', 'v2b',
+  'a gente vai', 'vamos fazer', 'vamos entregar',
+  'nosso diagnóstico', 'nossa metodologia',
+  'a consultoria', 'nós vamos'
+];
+
+// Nomes de consultores conhecidos
+const CONSULTANT_NAMES = ['luana', 'emília', 'emilia'];
+
+function isAboutConsultancy(content: string): boolean {
+  const lower = content.toLowerCase();
+  
+  // Check keywords
+  for (const keyword of CONSULTANCY_KEYWORDS) {
+    if (lower.includes(keyword)) return true;
+  }
+  
+  // Check if starts with consultant action
+  for (const name of CONSULTANT_NAMES) {
+    if (lower.startsWith(name) || lower.includes(`${name} vai`)) return true;
+  }
+  
+  return false;
+}
+
+// Filtrar evidências após extração
+const filteredEvidences = evidences.filter(ev => 
+  ev.is_about_client !== false && !isAboutConsultancy(ev.content)
+);
+```
+
+## Arquivos a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/analyze-evidences/index.ts` | Reformular prompt + adicionar filtro pós-extração |
+
+## Novo System Prompt Completo
+
 ```text
-Você é um editor de evidências de diagnóstico comercial.
+Você é um Auditor Sênior de Vendas B2B extraindo evidências para diagnóstico comercial.
 
-Analise estas evidências e identifique GRUPOS que dizem semanticamente a mesma coisa.
-Para cada grupo de duplicatas:
-1. Escolha a frase MAIS COMPLETA e bem escrita para representar o grupo (a "vencedora")
-2. Liste os IDs das evidências redundantes que devem ser arquivadas
+═══════════════════════════════════════════════════════════════
+                    TESTE DE RELEVÂNCIA OBRIGATÓRIO
+═══════════════════════════════════════════════════════════════
+
+ANTES de extrair qualquer evidência, aplique este teste a CADA frase:
+
+┌─────────────────────────────────────────────────────────────┐
+│ PERGUNTA 1: O sujeito da frase é o CLIENTE?                │
+│ - "O time de vendas não usa CRM" → SIM (cliente)           │
+│ - "A Vendas2B vai mapear processos" → NÃO (consultoria)    │
+│                                                             │
+│ Se NÃO → DESCARTE IMEDIATAMENTE                            │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ PERGUNTA 2: A frase descreve um FATO ATUAL ou uma          │
+│             PROMESSA FUTURA?                                │
+│ - "Usamos HubSpot desde 2022" → FATO ATUAL ✓               │
+│ - "Vamos implementar dashboards" → PROMESSA FUTURA ✗       │
+│                                                             │
+│ Se PROMESSA FUTURA → DESCARTE                              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ PERGUNTA 3: A frase é sobre metodologia/escopo de projeto? │
+│ - "Nossa metodologia tem 5 pilares" → SIM (escopo) ✗       │
+│ - "O processo de vendas demora 45 dias" → NÃO (cliente) ✓  │
+│                                                             │
+│ Se SIM → DESCARTE                                          │
+└─────────────────────────────────────────────────────────────┘
+
+TERMOS QUE INDICAM DESCARTE AUTOMÁTICO:
+- "Vendas2B", "Vendas to Be", "V2B", "a consultoria"
+- "Luana vai...", "João vai...", "Emília vai..."
+- "A gente vai...", "Nós vamos...", "Vamos entregar..."
+- "Nosso diagnóstico", "Nossa metodologia", "Nosso projeto"
+
+═══════════════════════════════════════════════════════════════
+
+PILARES DE CLASSIFICAÇÃO:
+1. Pessoas - Perfil, Skills, Motivação, Comportamento
+2. Processos - Fluxo, Gargalos, Cadência, SLA
+3. Dados - KPIs, Metas, Conversão, Métricas
+4. Tecnologia - CRM, Ferramentas, Stack, Automação
+5. Gestão & Cultura - Rituais, Crenças, Alinhamento
 
 REGRAS:
-- Duas evidências são duplicatas se comunicam o MESMO INSIGHT, mesmo com palavras diferentes
-- "Time não usa CRM" e "Equipe evita preencher o sistema" são DUPLICATAS
-- "Time não usa CRM" e "CRM tem poucos campos" são DIFERENTES
-- Quando em dúvida, NÃO consolide
-
-Responda em JSON:
-{
-  "consolidations": [
-    {
-      "winner_id": "uuid-da-vencedora",
-      "redundant_ids": ["uuid-1", "uuid-2"],
-      "reason": "Todas falam sobre baixa adoção do CRM"
-    }
-  ],
-  "stats": {
-    "total_analyzed": 50,
-    "groups_found": 8,
-    "evidences_archived": 22
-  }
-}
+- Extraia APENAS evidências que passam no teste de relevância
+- Seja factual e direto
+- Prefira frases completas e contextualizadas
+- Marque is_divergence=true se houver contradição explícita
+- Marque is_about_client=false se tiver QUALQUER dúvida
 ```
 
-### Novo Hook `useConsolidateEvidences.ts`
-
-```typescript
-export function useConsolidateEvidences() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (projectId: string) => {
-      const { data, error } = await supabase.functions.invoke('consolidate-evidences', {
-        body: { projectId }
-      });
-      if (error || data.error) throw new Error(data?.error || error.message);
-      return data;
-    },
-    onSuccess: (_, projectId) => {
-      queryClient.invalidateQueries({ queryKey: ['evidences', projectId] });
-    },
-  });
-}
-```
-
-### Atualizar `Matriz.tsx`
-
-Adicionar botão "Consolidar Evidências" no header:
+## Fluxo de Filtragem
 
 ```text
-+------------------------------------------------------------------+
-| Matriz de Diagnóstico                                             |
-| Mesa de trabalho do consultor...                                  |
-|                                                                   |
-|  [🧹 Consolidar Evidências]  [+ Nova Evidência]                  |
-+------------------------------------------------------------------+
+Texto de entrada (transcrição de reunião)
+         ↓
+    [PROMPT REFORÇADO]
+    "Aplique o teste de relevância"
+         ↓
+    [TOOL CALL COM VALIDAÇÃO]
+    is_about_client: true/false
+         ↓
+    [FILTRO PÓS-EXTRAÇÃO]
+    Regex para keywords da consultoria
+         ↓
+    Evidências limpas salvas no banco
 ```
 
-**Estados:**
-- Normal: "🧹 Consolidar Evidências"
-- Loading: "A IA está organizando a casa..." (com spinner)
-- Sucesso: Toast "22 evidências consolidadas. Matriz mais limpa!"
+## Resultado Esperado
 
-## Secao Tecnica
-
-### Ordem de Implementação
-
-1. Atualizar `supabase/config.toml` (nova função)
-2. Atualizar `analyze-evidences/index.ts` (blacklist + contexto)
-3. Atualizar `useAnalyzeEvidences.ts` (passar collaboratorId)
-4. Atualizar `Vault.tsx` (passar collaboratorId do asset)
-5. Criar `consolidate-evidences/index.ts` (nova função)
-6. Criar `useConsolidateEvidences.ts` (novo hook)
-7. Atualizar `Matriz.tsx` (botão consolidar)
-
-### Dependências da Edge Function
-
-A função `analyze-evidences` precisará criar um cliente Supabase para buscar dados:
-
-```typescript
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
-
-// Buscar colaborador
-const { data: collaborator } = await supabase
-  .from('collaborators')
-  .select('name, role, disc_profile')
-  .eq('id', collaboratorId)
-  .single();
-
-// Buscar evidências anteriores
-const { data: previousEvidences } = await supabase
-  .from('evidences')
-  .select('content')
-  .eq('project_id', projectId)
-  .eq('status', 'validado')
-  // Filtrar por colaborador quando tivermos asset_id
-  .order('created_at', { ascending: false })
-  .limit(5);
-```
-
-### Limite de Tokens na Consolidação
-
-Para projetos com muitas evidências:
-- Processar em lotes de 50 evidências
-- Agrupar por pilar antes de enviar ao LLM
-- Usar gpt-4o-mini para custo/eficiência
-
-### Tratamento de Erros
-
-| Cenário | Comportamento |
-|---------|---------------|
-| Colaborador não encontrado | Processar sem contexto (fallback) |
-| Nenhuma evidência anterior | Omitir seção "O que já sabemos" |
-| Menos de 5 evidências para consolidar | Toast: "Poucas evidências para consolidar" |
-| Erro na API | Toast de erro, manter estado anterior |
-
-### Fluxo de Dados Atualizado
-
-```text
-1. Upload no Vault
-   └── collaborator_id salvo em assets
-   
-2. analyze-evidences
-   ├── Recebe collaboratorId
-   ├── Busca contexto (DISC + histórico)
-   ├── Aplica blacklist Vendas2B
-   └── Extrai evidências filtradas
-
-3. Matriz
-   ├── Exibe evidências
-   └── Botão "Consolidar"
-       ├── Chama consolidate-evidences
-       ├── LLM agrupa duplicatas
-       └── Atualiza status para rejeitado
-```
+| Antes | Depois |
+|-------|--------|
+| "Luana menciona que a equipe da Vendas to Be irá realizar um diagnóstico" | **DESCARTADA** (filtro pós-extração) |
+| "O time não preenche o CRM por falta de tempo" | **MANTIDA** ✓ |
+| "Vamos entregar um dashboard personalizado" | **DESCARTADA** (prompt + filtro) |
+| "A meta de conversão é 25%" | **MANTIDA** ✓ |
 
