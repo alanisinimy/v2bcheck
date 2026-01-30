@@ -1,224 +1,222 @@
 
 
-# Plano: Implementar "Auto-Fill Context" (Preenchimento Inteligente)
+# Plano: Vincular Arquivos a Colaboradores no Upload
 
 ## Resumo
 
-Criar funcionalidade que analisa automaticamente todas as transcrições/reuniões do projeto para extrair e preencher os campos de contexto na aba "Visão Geral". Isso evita que o Plano Estratégico faça sugestões genéricas (ex: "implementar CRM" quando o cliente já usa HubSpot).
+Adicionar um passo no fluxo de upload do Vault que permite vincular arquivos a colaboradores existentes. Isso resolve o problema de evidências duplicadas/desconexas, pois o sistema saberá que diferentes arquivos pertencem à mesma pessoa (ex: "Formulário da Tatiane" vinculado a "Tatiane Rodrigues").
 
 ## Arquitetura da Solução
 
 ```text
-+------------------------+      +-------------------------+      +----------------+
-| ProjectOverviewForm    |----->| extract-project-context |----->| projects table |
-| "Extrair das Reuniões" |      | (Edge Function)         |      | client_context |
-+------------------------+      +-------------------------+      | main_pain_points|
-                                        |                        | project_goals  |
-                                        v                        +----------------+
-                                +---------------+
-                                | Storage       |
-                                | (arquivos txt)|
-                                +---------------+
-                                        |
-                                        v
-                                +---------------+
-                                | OpenAI API    |
-                                | (gpt-4o-mini) |
-                                +---------------+
++-------------------+      +-------------------+      +------------------+
+| FileUploadZone    |----->| SourceTypeModal   |----->| assets table     |
+| (selecionar)      |      | + CollaboratorPicker |   | collaborator_id  |
++-------------------+      +-------------------+      +------------------+
+                                   |
+                                   v
+                           +---------------+
+                           | collaborators |
+                           | (dropdown)    |
+                           +---------------+
 ```
 
 ## Fluxo de Usuario
 
-1. Usuario vai para Dashboard > Aba "Visão Geral"
-2. Clica no botão "Extrair Contexto das Reuniões"
-3. Sistema exibe loading: "Analisando transcrições..."
-4. Edge function busca todos os arquivos de texto do projeto
-5. IA extrai contexto, stack tecnológico e dores latentes
-6. Campos são preenchidos automaticamente na tela
-7. Usuario pode revisar e clicar em "Salvar Alterações"
+1. Usuario arrasta arquivo no Vault
+2. Modal abre: "Qual é a origem deste arquivo?"
+3. Usuario seleciona "Entrevista (Time)" ou "Perfil DISC" ou "Briefing"
+4. SE for um desses tipos, aparece segundo campo: "Este arquivo pertence a algum colaborador?"
+   - Dropdown com colaboradores do projeto
+   - Opcao "Geral (Sem vínculo)"
+   - Opcao "Criar novo colaborador"
+5. Usuario confirma e o arquivo é processado com o vínculo
 
-## Modificações nos Arquivos
+## Mudancas no Banco de Dados
 
-### 1. Nova Edge Function `extract-project-context/index.ts`
+Adicionar coluna `collaborator_id` na tabela `assets`:
 
-**Endpoint:** `POST /extract-project-context`
-
-**Input:**
-```json
-{
-  "projectId": "uuid"
-}
+```sql
+ALTER TABLE public.assets
+ADD COLUMN collaborator_id UUID REFERENCES public.collaborators(id) ON DELETE SET NULL;
 ```
 
-**Lógica:**
-1. Buscar assets do projeto (source_type != 'perfil_disc', status = 'completed')
-2. Para cada asset .txt, baixar conteúdo do Storage
-3. Concatenar todos os textos (limite de tokens)
-4. Enviar para GPT-4o-mini com prompt de Auditor
+| Coluna | Tipo | Descricao |
+|--------|------|-----------|
+| collaborator_id | UUID | ID do colaborador vinculado (nullable) |
 
-**Prompt do Especialista:**
-```text
-Você é um Auditor Sênior de Diagnóstico Comercial.
+## Tipos de Origem que Exigem Vínculo
 
-Leia todas as transcrições de reuniões deste projeto e extraia 
-um resumo executivo para preencher 3 campos:
+| Source Type | Exige Colaborador? |
+|-------------|-------------------|
+| entrevista_operacao | Sim (Opcional) |
+| briefing | Sim (Opcional) |
+| perfil_disc | Sim (Recomendado) |
+| entrevista_diretoria | Nao |
+| reuniao_kickoff | Nao |
+| reuniao_vendas | Nao |
+| documentacao | Nao |
 
-1. CONTEXTO DA EMPRESA:
-   - O que a empresa faz
-   - Tempo de mercado / tamanho do time
-   - Modelo de venda (Inside Sales, Field Sales, PLG)
-   - Segmento e ticket médio
+## Modificacoes nos Arquivos
 
-2. STACK TECNOLÓGICO & PROCESSOS:
-   - Liste TODAS as ferramentas citadas (CRM, ERP, planilhas)
-   - Como cada ferramenta é usada atualmente
-   - Integrações existentes
-   - Ferramentas que estão sendo avaliadas/desejadas
+### 1. Atualizar `src/lib/types.ts`
 
-3. DORES LATENTES:
-   - Problemas citados repetidamente
-   - Frustrações do time
-   - Gaps identificados
-   - Metas não atingidas
-
-REGRA CRÍTICA: Seja factual. Extraia apenas o que foi 
-explicitamente dito nas transcrições.
-
-Responda em JSON:
-{
-  "client_context": "Texto resumido do contexto...",
-  "main_pain_points": "Lista de dores...",
-  "project_goals": "Objetivos inferidos..."
-}
-```
-
-**Output:**
-```json
-{
-  "client_context": "Empresa de tecnologia B2B com 50 funcionários, 8 anos de mercado. Utiliza HubSpot como CRM principal...",
-  "main_pain_points": "Time não preenche o CRM consistentemente. Forecast impreciso. Alta rotatividade de SDRs...",
-  "project_goals": "Aumentar previsibilidade do pipeline. Melhorar adoção do CRM. Reduzir turnover."
-}
-```
-
-### 2. Novo Hook `useExtractContext.ts`
+Adicionar `collaborator_id` na interface `Asset`:
 
 ```typescript
-export function useExtractContext() {
-  return useMutation({
-    mutationFn: async (projectId: string) => {
-      const { data, error } = await supabase.functions.invoke(
-        'extract-project-context',
-        { body: { projectId } }
-      );
-      if (error || data.error) throw new Error(data?.error || error.message);
-      return data;
-    },
-  });
+export interface Asset {
+  // ... campos existentes
+  collaborator_id?: string;
 }
 ```
 
-### 3. Atualizar `ProjectOverviewForm.tsx`
+### 2. Atualizar `SourceTypeModal.tsx`
 
-**Adicionar:**
-- Botão "Extrair Contexto das Reuniões" no topo do form
-- Estado de loading com mensagem "Analisando transcrições..."
-- Após sucesso, preencher os 3 campos e mostrar toast
-- Manter mudanças como "não salvas" para usuário revisar
+Modificar o modal para incluir um segundo passo quando source_type for relevante:
 
-**Layout:**
+**Novo layout:**
 ```text
-+--------------------------------------------------+
-| [✨ Extrair Contexto das Reuniões]               |
-+--------------------------------------------------+
-|                                                  |
-| 🏢 Contexto da Empresa                           |
-| [textarea preenchida automaticamente]            |
-|                                                  |
-| ⚠️ Dores Latentes                                |
-| [textarea preenchida automaticamente]            |
-|                                                  |
-| 🎯 Objetivos do Projeto                          |
-| [textarea preenchida automaticamente]            |
-|                                                  |
-|                        [Salvar Alterações]       |
-+--------------------------------------------------+
++------------------------------------------+
+| Qual é a origem deste arquivo?           |
+| arquivo.pdf                               |
++------------------------------------------+
+| [x] 👥 Entrevista (Time/Operação)        |
+| [ ] 📝 Briefing / Formulário             |
+| [ ] 📋 Perfil DISC                       |
+| [ ] ...outros                            |
++------------------------------------------+
+| Este arquivo pertence a algum colaborador?|
+| [Selecionar colaborador...          ▼]  |
+| - Geral (Sem vínculo)                    |
+| - Tatiane Rodrigues                      |
+| - João Silva                             |
+| - + Criar novo colaborador               |
++------------------------------------------+
+|                 [Cancelar] [Processar]   |
++------------------------------------------+
 ```
 
-### 4. Atualizar `generate-strategic-plan/index.ts`
+**Logica:**
+- Campo de colaborador aparece condicionalmente
+- Se "Criar novo", abre sub-modal de criacao
+- Opcao "Geral" = collaborator_id null
 
-**Adicionar:**
-1. Buscar dados da tabela `projects` (client_context, main_pain_points, project_goals)
-2. Incluir no prompt como "CONTEXTO OBRIGATÓRIO"
-3. Adicionar regra de não duplicar ferramentas existentes
+### 3. Atualizar `useUploadAsset.ts`
 
-**Novo trecho do prompt:**
-```text
-CONTEXTO OBRIGATÓRIO DA EMPRESA:
-${project.client_context || 'Não informado'}
+Adicionar campo `collaboratorId` opcional:
 
-STACK TECNOLÓGICO EXISTENTE:
-${project.main_pain_points || 'Não informado'}
-
-REGRA CRÍTICA: Se o contexto menciona que a empresa JÁ USA uma 
-ferramenta (ex: HubSpot, Salesforce), NUNCA sugira "Implementar" 
-ou "Comprar". Sugira:
-- "Auditoria de [Ferramenta]"
-- "Otimização de [Ferramenta]"  
-- "Treinamento de [Ferramenta]"
+```typescript
+interface UploadAssetData {
+  projectId: string;
+  file: File;
+  sourceType: SourceType;
+  collaboratorId?: string; // NOVO
+}
 ```
 
-### 5. Atualizar `supabase/config.toml`
+Incluir na insercao:
 
-```toml
-[functions.extract-project-context]
-verify_jwt = false
+```typescript
+const { data: asset, error: insertError } = await supabase
+  .from('assets')
+  .insert({
+    // ...campos existentes
+    collaborator_id: collaboratorId || null, // NOVO
+  })
 ```
 
-## Tratamento de Casos Especiais
+### 4. Atualizar `Vault.tsx`
 
-| Cenário | Comportamento |
-|---------|---------------|
-| Nenhum arquivo de texto | Mostrar toast: "Nenhuma transcrição encontrada. Faça upload de reuniões no Vault." |
-| Arquivos muito grandes | Truncar para ~50.000 caracteres (limite de contexto) |
-| Campos já preenchidos | Confirmar se usuário quer sobrescrever |
-| Erro na API | Toast de erro, manter campos anteriores |
+Modificar interfaces e handlers:
+
+```typescript
+interface PendingFile {
+  file: File;
+  sourceType?: SourceType;
+  collaboratorId?: string; // NOVO
+}
+```
+
+Passar colaboratorId no processFiles:
+
+```typescript
+const asset = await uploadAssetMutation.mutateAsync({
+  projectId: currentProject.id,
+  file,
+  sourceType,
+  collaboratorId, // NOVO
+});
+```
+
+### 5. Criar `CollaboratorPicker.tsx` (Novo Componente)
+
+Componente de selecao de colaborador reutilizavel:
+
+```typescript
+interface CollaboratorPickerProps {
+  projectId: string;
+  value: string | null;
+  onChange: (collaboratorId: string | null) => void;
+  onCreateNew?: () => void;
+}
+```
+
+Features:
+- Lista colaboradores do projeto via useCollaborators
+- Opcao "Geral (Sem vínculo)" no topo
+- Opcao "Criar novo" no final
+- Styled como Select/Combobox
+
+### 6. Atualizar `AddCollaboratorDialog.tsx`
+
+Adicionar prop para callback apos criacao:
+
+```typescript
+interface AddCollaboratorDialogProps {
+  // ...props existentes
+  onCreated?: (collaborator: Collaborator) => void;
+}
+```
+
+Isso permite que o modal de upload selecione automaticamente o colaborador recem-criado.
 
 ## Secao Tecnica
 
-### Ordem de Implementação
+### Ordem de Implementacao
 
-1. Criar edge function `extract-project-context`
-2. Atualizar `supabase/config.toml`
-3. Criar hook `useExtractContext.ts`
-4. Atualizar `ProjectOverviewForm.tsx` (UI + integração)
-5. Atualizar `generate-strategic-plan` (usar contexto no prompt)
+1. Migracao SQL (adicionar coluna collaborator_id)
+2. Atualizar `src/lib/types.ts` (interface Asset)
+3. Atualizar `useUploadAsset.ts` (aceitar collaboratorId)
+4. Criar componente `CollaboratorPicker.tsx`
+5. Atualizar `SourceTypeModal.tsx` (adicionar picker condicional)
+6. Atualizar `Vault.tsx` (passar collaboratorId no fluxo)
+7. Atualizar `AddCollaboratorDialog.tsx` (callback onCreated)
 
-### Dependências
-
-- Nenhuma nova dependência
-- Reutiliza cliente Supabase para Storage
-- Reutiliza padrões de edge functions existentes
-
-### Acesso ao Storage na Edge Function
+### Tipos que Ativam o Picker
 
 ```typescript
-// Baixar arquivo do Storage
-const { data: fileData, error: downloadError } = await supabase
-  .storage
-  .from('project-files')
-  .download(asset.storage_path);
+const SOURCE_TYPES_WITH_COLLABORATOR: SourceType[] = [
+  'entrevista_operacao',
+  'briefing',
+  'perfil_disc',
+];
 
-if (!downloadError && fileData) {
-  const text = await fileData.text();
-  allContent += text + '\n\n---\n\n';
-}
+const showCollaboratorPicker = selected && 
+  SOURCE_TYPES_WITH_COLLABORATOR.includes(selected);
 ```
 
-### Limite de Tokens
+### Tratamento de Casos Especiais
 
-Para evitar exceder o contexto do modelo:
-- Concatenar no máximo 50.000 caracteres
-- Priorizar arquivos mais recentes (ordenar por created_at DESC)
-- Pular arquivos binários (apenas .txt, .md, .csv)
+| Cenario | Comportamento |
+|---------|---------------|
+| Nenhum colaborador cadastrado | Mostrar opcoes "Geral" e "Criar novo" apenas |
+| Usuario cancela criacao | Manter modal de upload aberto |
+| DISC com colaborador | Ao processar, atualizar o colaborador existente em vez de criar novo |
+| Arquivo grande | Picker carrega enquanto arquivo processa |
+
+### Integracao com analyze-evidences
+
+Quando `collaboratorId` estiver presente, incluir no contexto da IA:
+- Nome do colaborador nas evidencias geradas
+- Evitar criar evidencias duplicadas sobre a mesma pessoa
 
