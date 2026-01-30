@@ -368,6 +368,28 @@ Deno.serve(async (req) => {
       throw new Error('Invalid gaps format');
     }
 
+    // Valid pilares in the database enum
+    const validPilares = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
+    
+    // Map any invalid pilar values to valid ones
+    gaps = gaps.map((gap: any) => {
+      let pilar = gap.pilar?.toLowerCase();
+      
+      // Map common AI mistakes to valid values
+      if (!validPilares.includes(pilar)) {
+        // cultura -> gestao (cultural issues are management issues)
+        if (pilar === 'cultura') {
+          pilar = 'gestao';
+        } else {
+          // Default fallback
+          pilar = 'processos';
+        }
+        console.log(`Mapped invalid pilar "${gap.pilar}" to "${pilar}"`);
+      }
+      
+      return { ...gap, pilar };
+    });
+
     console.log(`Extracted ${gaps.length} strategic gaps`);
 
     // Log gaps for debugging
