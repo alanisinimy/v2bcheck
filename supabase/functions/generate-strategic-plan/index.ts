@@ -43,6 +43,21 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Fetch project context
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('client_context, main_pain_points, project_goals')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) {
+      console.error('Error fetching project:', projectError);
+    }
+
+    const projectContext = project?.client_context || 'Não informado';
+    const projectPainPoints = project?.main_pain_points || 'Não informado';
+    const projectGoals = project?.project_goals || 'Não informado';
+
     // Fetch validated evidences
     const { data: evidences, error: evidencesError } = await supabase
       .from('evidences')
@@ -114,7 +129,16 @@ CONTEXTO DOS 5 PILARES:
 - TECNOLOGIA: CRM, Stack, Automação
 - GESTÃO: Rituais, Cultura, Alinhamento
 
-REGRA CRÍTICA: As soluções DEVEM considerar a psicologia do time (perfil DISC).
+REGRA CRÍTICA #1: As soluções DEVEM considerar a psicologia do time (perfil DISC).
+
+REGRA CRÍTICA #2 - FERRAMENTAS EXISTENTES: 
+Se o contexto da empresa menciona que JÁ USAM uma ferramenta (ex: HubSpot, Pipedrive, Salesforce, Excel, etc.), 
+você NUNCA deve sugerir "Implementar" ou "Adquirir" essa ferramenta. 
+Em vez disso, sugira:
+- "Auditoria de [Ferramenta]" - para verificar se está sendo usada corretamente
+- "Otimização de [Ferramenta]" - para melhorar o uso atual
+- "Treinamento de [Ferramenta]" - para capacitar o time
+- "Integração de [Ferramenta] com [Outra]" - para conectar sistemas
 
 EXEMPLOS DE CRUZAMENTO:
 - Problema: "Falta de preenchimento de CRM" + Time "Alto I" 
@@ -150,6 +174,15 @@ Gere de 3 a 5 iniciativas estratégicas priorizadas por impacto/esforço.`
             role: 'user',
             content: `Gere um plano estratégico para este diagnóstico comercial.
 
+CONTEXTO OBRIGATÓRIO DA EMPRESA:
+${projectContext}
+
+OBJETIVOS DO PROJETO:
+${projectGoals}
+
+STACK TECNOLÓGICO E DORES IDENTIFICADAS:
+${projectPainPoints}
+
 PERFIL DO TIME:
 ${teamProfileDescription}
 ${collaborators?.length ? `\nColaboradores: ${collaborators.map(c => `${c.name} (${c.primary_style || 'sem perfil'})`).join(', ')}` : ''}
@@ -160,6 +193,7 @@ ${problemsList || 'Nenhum problema específico identificado'}
 PONTOS FORTES:
 ${strengthsList || 'Nenhum ponto forte identificado'}
 
+IMPORTANTE: Considere o contexto da empresa e as ferramentas que JÁ USAM. Não sugira implementar o que já existe.
 Considere o perfil comportamental do time ao propor soluções.`
           }
         ],
