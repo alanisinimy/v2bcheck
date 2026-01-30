@@ -1,192 +1,112 @@
 
 
-# Plano: Upload em Massa na Aba Time
+# Plano: Adicionar Coluna de Status na Matriz de Gaps
 
 ## Objetivo
-Permitir que usuarios facam upload de multiplos arquivos de uma vez na aba Time (PDFs DISC e CSVs de clima), seguindo o mesmo padrao de fluxo de classificacao arquivo por arquivo que ja existe no Vault.
+Exibir o status de cada evidência/gap diretamente na tabela da Matriz, permitindo visualização rápida do estado de validação sem precisar abrir o menu de ações.
 
 ---
 
-## 1. Alteracoes no Componente de Upload
+## 1. Alterações no Componente da Tabela
 
-### `src/components/team/PeopleDataUploadZone.tsx`
+### `src/components/matriz/EvidenceTable.tsx`
 
-**Mudancas:**
-- Alterar `multiple: false` para `multiple: true` no useDropzone
-- Atualizar texto para indicar suporte a multiplos arquivos
-- Adicionar contador de arquivos pendentes (opcional)
+Adicionar nova coluna "Status" no cabeçalho:
 
+**Antes:**
 ```
-// Antes
-multiple: false,
-
-// Depois
-multiple: true,
+ID | Pilar | Gap Identificado | Benchmark | Impacto | Criticidade | Ações
 ```
 
-**Texto atualizado:**
-- "Arraste arquivos ou clique para selecionar" (plural)
-- "PDFs DISC e CSVs de Pesquisa de Clima"
+**Depois:**
+```
+ID | Pilar | Gap Identificado | Benchmark | Impacto | Criticidade | Status | Ações
+```
+
+**Mudança específica:**
+- Adicionar `<TableHead className="w-[100px]">Status</TableHead>` após Criticidade
+- Atualizar `colSpan` no estado vazio de 7 para 8
 
 ---
 
-## 2. Novo Modal de Classificacao Sequencial
+## 2. Alterações na Linha da Tabela
 
-### `src/components/team/PeopleDataBatchModal.tsx` (Novo)
+### `src/components/matriz/EvidenceTableRow.tsx`
 
-Criar modal que processa multiplos arquivos sequencialmente, similar ao `SourceTypeModal` do Vault:
+Adicionar nova célula exibindo o status com badge colorido:
 
-**Funcionalidades:**
-- Exibir progresso: "Arquivo 2 de 5"
-- Para cada arquivo:
-  - Nome do arquivo atual
-  - Tipo detectado automaticamente (PDF = DISC, CSV = Clima)
-  - Selector de colaborador (apenas para DISC)
-- Botoes: "Pular", "Proximo", "Processar Todos"
+**Visual:**
+| Status | Cor do Badge |
+|--------|--------------|
+| Pendente | Cinza (bg-muted) |
+| Validado | Verde (bg-success/15) |
+| Rejeitado | Vermelho (bg-destructive/15) |
+| Investigar | Amarelo (bg-warning/15) |
 
-**Props:**
+**Código da nova célula:**
 ```typescript
-interface PeopleDataBatchModalProps {
-  open: boolean;
-  files: File[];
-  collaborators: { id: string; name: string }[];
-  onProcessFiles: (classifiedFiles: ClassifiedFile[]) => Promise<void>;
-  onCancel: () => void;
-  isProcessing: boolean;
-  currentProcessingIndex: number;
-}
-
-interface ClassifiedFile {
-  file: File;
-  dataType: 'perfil_disc' | 'pesquisa_clima';
-  collaboratorId?: string;
-}
-```
-
-**UI:**
-```
-+------------------------------------------+
-|  Classificar Arquivos (2 de 5)           |
-+------------------------------------------+
-|                                          |
-|  [icone] colaborador_joao.pdf            |
-|  Tipo detectado: PDF (Perfil DISC)       |
-|                                          |
-|  Vincular a colaborador:                 |
-|  [Dropdown: Joao Silva        v]         |
-|                                          |
-|  ----------------------------------------|
-|  [Pular]              [Proximo ->]       |
-|                  [Processar Todos]       |
-+------------------------------------------+
+<TableCell className="w-[100px]">
+  <Badge 
+    variant="outline" 
+    className={cn('text-xs', STATUS_CONFIG[evidence.status].color)}
+  >
+    {STATUS_CONFIG[evidence.status].label}
+  </Badge>
+</TableCell>
 ```
 
 ---
 
-## 3. Atualizacao da Pagina Team
+## 3. (Opcional) Filtro por Status
 
-### `src/pages/Team.tsx`
+### `src/components/matriz/TableFilters.tsx`
 
-**Novas States:**
+Adicionar filtro de status aos filtros existentes:
+
+**Novo dropdown:**
+- "Todos os Status"
+- "Pendente"
+- "Validado"
+- "Rejeitado"
+- "Investigar"
+
+**Props adicionais:**
 ```typescript
-const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-const [currentFileIndex, setCurrentFileIndex] = useState(0);
-const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
-const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-const [processingProgress, setProcessingProgress] = useState(0);
-```
-
-**Atualizar `handleFilesSelected`:**
-```typescript
-const handleFilesSelected = useCallback((files: File[]) => {
-  if (files.length === 0) return;
-  
-  // Multiplos arquivos: abrir modal de classificacao em lote
-  setPendingFiles(files);
-  setCurrentFileIndex(0);
-  setClassifiedFiles([]);
-  setIsBatchModalOpen(true);
-}, []);
-```
-
-**Novo Handler de Processamento em Lote:**
-```typescript
-const handleBatchProcess = async (files: ClassifiedFile[]) => {
-  setIsProcessingFile(true);
-  
-  for (let i = 0; i < files.length; i++) {
-    setProcessingProgress(i + 1);
-    const { file, dataType, collaboratorId } = files[i];
-    
-    // Processar cada arquivo...
-    // (reutilizar logica existente)
-  }
-  
-  setIsProcessingFile(false);
-  setIsBatchModalOpen(false);
-  setPendingFiles([]);
-};
+selectedStatus: EvidenceStatus | 'all';
+onStatusChange: (status: EvidenceStatus | 'all') => void;
 ```
 
 ---
 
-## 4. Indicador de Progresso
-
-### No Modal de Classificacao
-- Barra de progresso visual
-- "Classificando 3 de 10 arquivos"
-
-### Durante o Processamento
-- Toast com progresso: "Processando arquivo 2 de 5..."
-- Feedback de sucesso consolidado ao final
-
----
-
-## Secao Tecnica
-
-### Arquivos a Criar
-
-| Arquivo | Descricao |
-|---------|-----------|
-| `src/components/team/PeopleDataBatchModal.tsx` | Modal de classificacao em lote |
+## Seção Técnica
 
 ### Arquivos a Modificar
 
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/components/team/PeopleDataUploadZone.tsx` | Habilitar `multiple: true` |
-| `src/pages/Team.tsx` | Adicionar estados e logica de processamento em lote |
+| `src/components/matriz/EvidenceTable.tsx` | Adicionar coluna Status no header, atualizar colSpan |
+| `src/components/matriz/EvidenceTableRow.tsx` | Adicionar célula com badge de status |
+| `src/components/matriz/TableFilters.tsx` | Adicionar filtro por status (opcional) |
 
-### Fluxo do Usuario
+### Estrutura Final da Tabela
 
 ```
-1. Usuario arrasta 5 PDFs DISC
-         |
-         v
-2. Modal abre: "Classificar Arquivos (1 de 5)"
-         |
-   +-----+-----+
-   |           |
-   v           v
-3a. Classifica   3b. "Processar Todos"
-    um por um        (auto-detecta tipo)
-         |           |
-         v           v
-4. Processamento em paralelo com feedback
-         |
-         v
-5. Toast: "5 colaboradores processados com sucesso"
++------+----------+------------------+-----------+---------+------------+----------+-------+
+|  ID  |  Pilar   | Gap Identificado | Benchmark | Impacto | Criticidade|  Status  | Ações |
++------+----------+------------------+-----------+---------+------------+----------+-------+
+| G01  | Processos| Baixa aderência..| CRM com...| Receita |    Alta    | Pendente |  ...  |
+| G02  | Pessoas  | Falta de treina..| Onboarding| Eficiên.|   Média    | Validado |  ...  |
++------+----------+------------------+-----------+---------+------------+----------+-------+
 ```
 
-### Dependencias
+### Importação Necessária
 
-- Nenhuma nova dependencia
-- Reutiliza componentes Dialog, Progress, Button do shadcn/ui
+Em `EvidenceTableRow.tsx`, importar `STATUS_CONFIG` de `@/lib/types`:
+```typescript
+import { PILARES, IMPACT_CONFIG, CRITICALITY_CONFIG, STATUS_CONFIG } from '@/lib/types';
+```
 
-### Inteligencia de Deteccao Automatica
-
-Para "Processar Todos" sem classificar um por um:
-- `.pdf` -> `perfil_disc`
-- `.csv` -> `pesquisa_clima`
-- Sem vinculo a colaborador (criar novos automaticamente)
+### Dependências
+- Nenhuma nova dependência
+- Reutiliza o `STATUS_CONFIG` já existente em `src/lib/types.ts`
 
