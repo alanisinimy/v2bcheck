@@ -193,9 +193,8 @@ A cultura da empresa valoriza resultados individuais sobre trabalho em equipe.
     try {
       const pdfjs = await import('pdfjs-dist');
       
-      // Use the worker from the package (bundled by Vite)
-      const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs');
-      pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.default || pdfjsWorker;
+      // Use the worker from CDN for reliable loading
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
       
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
