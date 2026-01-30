@@ -109,9 +109,53 @@ Se não conseguir identificar valores numéricos exatos, estime baseado em descr
     }
 
     const openaiData = await openaiResponse.json();
-    const extracted: ExtractedDisc = JSON.parse(openaiData.choices[0].message.content);
+    const rawExtracted = JSON.parse(openaiData.choices[0].message.content);
 
-    console.log('Extracted DISC profile:', extracted);
+    console.log('Raw extracted DISC profile:', rawExtracted);
+
+    // Validate and sanitize the extracted data
+    const validStyles = ['D', 'I', 'S', 'C'];
+    
+    // Check if the AI failed to extract valid data
+    if (!rawExtracted.name || rawExtracted.name === 'null' || rawExtracted.name.toLowerCase() === 'null') {
+      return new Response(
+        JSON.stringify({ error: 'Não foi possível extrair o nome do colaborador do PDF. Verifique se é um relatório DISC válido.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate primary_style - if invalid, determine from disc_profile values
+    let primaryStyle = rawExtracted.primary_style;
+    if (!validStyles.includes(primaryStyle)) {
+      // Determine primary style from the highest DISC value
+      const profile = rawExtracted.disc_profile || { dom: 0, inf: 0, est: 0, conf: 0 };
+      const styleMap: [string, number][] = [
+        ['D', profile.dom || 0],
+        ['I', profile.inf || 0],
+        ['S', profile.est || 0],
+        ['C', profile.conf || 0],
+      ];
+      styleMap.sort((a, b) => b[1] - a[1]);
+      primaryStyle = styleMap[0][0] as 'D' | 'I' | 'S' | 'C';
+    }
+
+    // Ensure disc_profile has valid numbers
+    const discProfile: DiscProfile = {
+      dom: Math.max(0, Math.min(100, Number(rawExtracted.disc_profile?.dom) || 0)),
+      inf: Math.max(0, Math.min(100, Number(rawExtracted.disc_profile?.inf) || 0)),
+      est: Math.max(0, Math.min(100, Number(rawExtracted.disc_profile?.est) || 0)),
+      conf: Math.max(0, Math.min(100, Number(rawExtracted.disc_profile?.conf) || 0)),
+    };
+
+    const extracted: ExtractedDisc = {
+      name: rawExtracted.name,
+      role: rawExtracted.role === 'null' ? undefined : rawExtracted.role,
+      disc_profile: discProfile,
+      primary_style: primaryStyle as 'D' | 'I' | 'S' | 'C',
+      insight: rawExtracted.insight === 'null' ? 'Perfil extraído automaticamente.' : rawExtracted.insight,
+    };
+
+    console.log('Validated DISC profile:', extracted);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
