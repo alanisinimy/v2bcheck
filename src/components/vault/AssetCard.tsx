@@ -7,6 +7,7 @@ import { SOURCE_TYPES } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +25,9 @@ interface AssetCardProps {
   index: number;
   onDelete?: (assetId: string, storagePath: string) => void;
   isDeleting?: boolean;
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onSelectionChange?: (assetId: string, selected: boolean) => void;
 }
 
 function getFileIcon(fileType: string) {
@@ -39,13 +43,31 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AssetCard({ asset, index, onDelete, isDeleting }: AssetCardProps) {
+export function AssetCard({ 
+  asset, 
+  index, 
+  onDelete, 
+  isDeleting,
+  isSelectionMode = false,
+  isSelected = false,
+  onSelectionChange,
+}: AssetCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const Icon = getFileIcon(asset.file_type);
 
   const handleDelete = () => {
     onDelete?.(asset.id, asset.storage_path);
     setIsDialogOpen(false);
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    onSelectionChange?.(asset.id, checked);
+  };
+
+  const handleCardClick = () => {
+    if (isSelectionMode) {
+      onSelectionChange?.(asset.id, !isSelected);
+    }
   };
   
   const statusConfig = {
@@ -87,8 +109,25 @@ export function AssetCard({ asset, index, onDelete, isDeleting }: AssetCardProps
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05, ease: [0.25, 0.1, 0.25, 1] }}
-      className="bg-card rounded-xl p-4 border border-border/50 shadow-soft flex items-center gap-4"
+      className={cn(
+        'bg-card rounded-xl p-4 border shadow-soft flex items-center gap-4 transition-colors',
+        isSelectionMode && 'cursor-pointer hover:bg-muted/50',
+        isSelected && 'border-primary bg-primary/5',
+        !isSelected && 'border-border/50'
+      )}
+      onClick={handleCardClick}
     >
+      {/* Selection Checkbox */}
+      {isSelectionMode && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={handleCheckboxChange}
+            className="h-5 w-5"
+          />
+        </div>
+      )}
+
       {/* File Icon */}
       <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
         <Icon className="w-6 h-6 text-muted-foreground" />
@@ -125,8 +164,8 @@ export function AssetCard({ asset, index, onDelete, isDeleting }: AssetCardProps
         <span>{status.label}</span>
       </div>
 
-      {/* Delete Button */}
-      {onDelete && (
+      {/* Delete Button - only show when not in selection mode */}
+      {onDelete && !isSelectionMode && (
         <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <AlertDialogTrigger asChild>
             <Button
@@ -134,6 +173,7 @@ export function AssetCard({ asset, index, onDelete, isDeleting }: AssetCardProps
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
               disabled={isDeleting}
+              onClick={(e) => e.stopPropagation()}
             >
               {isDeleting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
