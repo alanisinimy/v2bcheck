@@ -49,23 +49,23 @@ async function buildCollaboratorContext(
 
     const assetIds = assets?.map((a: any) => a.id) || [];
 
-    let previousEvidences: string[] = [];
+    let previousGaps: string[] = [];
     if (assetIds.length > 0) {
       const { data: evidences } = await supabase
         .from('evidences')
-        .select('content')
+        .select('content, benchmark')
         .in('asset_id', assetIds)
         .eq('status', 'validado')
         .order('created_at', { ascending: false })
         .limit(5);
 
-      previousEvidences = evidences?.map((e: any) => e.content) || [];
+      previousGaps = evidences?.map((e: any) => e.content) || [];
     }
 
     // Build context string
     let context = `
 CONTEXTO DO COLABORADOR:
-Você está analisando um arquivo de ${collaborator.name}.`;
+Você está analisando um arquivo vinculado a ${collaborator.name}.`;
 
     if (collaborator.role) {
       context += `\nCargo: ${collaborator.role}`;
@@ -74,22 +74,16 @@ Você está analisando um arquivo de ${collaborator.name}.`;
     if (collaborator.disc_profile) {
       const profile = collaborator.disc_profile as { D: number; I: number; S: number; C: number };
       context += `\nPerfil Comportamental DISC: ${formatDiscProfile(profile)}`;
+      context += `\n\nUse o perfil DISC para contextualizar os gaps. Ex: Se a pessoa é Alto D e reclama de processos lentos, isso pode indicar um gap de "Burocracia que bloqueia vendedores de alto desempenho".`;
     }
 
-    if (previousEvidences.length > 0) {
-      context += `\n\nO QUE JÁ SABEMOS SOBRE ${collaborator.name.toUpperCase()}:`;
-      previousEvidences.forEach((ev: string) => {
-        context += `\n- ${ev}`;
+    if (previousGaps.length > 0) {
+      context += `\n\nGAPS JÁ IDENTIFICADOS ANTERIORMENTE:`;
+      previousGaps.forEach((gap: string) => {
+        context += `\n- ${gap}`;
       });
+      context += `\n\nNÃO repita esses gaps. Se encontrar informações novas sobre eles, pode aprofundar ou identificar causa-raiz.`;
     }
-
-    context += `
-
-INSTRUÇÃO ESPECIAL: 
-Cruze novas informações com o perfil DISC. Se a pessoa reclama de algo,
-verifique se confirma uma característica do perfil (ex: Alto I resiste a processos rígidos,
-Alto D pode ter conflitos de autoridade, Alto S resiste a mudanças bruscas, Alto C reclama de falta de dados).
-`;
 
     return context;
   } catch (error) {
@@ -99,105 +93,106 @@ Alto D pode ter conflitos de autoridade, Alto S resiste a mudanças bruscas, Alt
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CAMADA 3: FILTRO PÓS-EXTRAÇÃO (Backend)
+// SYSTEM PROMPT: CONSULTOR ESTRATÉGICO (McKinsey/Deloitte Style)
 // ═══════════════════════════════════════════════════════════════
 
-// Palavras-chave que indicam evidência sobre consultoria
-const CONSULTANCY_KEYWORDS = [
-  'vendas2b', 'vendas to be', 'vendas 2 be', 'v2b',
-  'a gente vai', 'vamos fazer', 'vamos entregar',
-  'nosso diagnóstico', 'nossa metodologia', 'nosso projeto',
-  'a consultoria', 'nós vamos', 'iremos implementar',
-  'nossa equipe vai', 'o diagnóstico vai', 'irá realizar',
-  'equipe da vendas', 'time da vendas'
-];
-
-// Nomes de consultores conhecidos
-const CONSULTANT_NAMES = ['luana', 'emília', 'emilia', 'joão', 'joao'];
-
-// Filtro pós-extração para capturar evidências que escapam do prompt
-function isAboutConsultancy(content: string): boolean {
-  const lower = content.toLowerCase();
-  
-  // Check keywords
-  for (const keyword of CONSULTANCY_KEYWORDS) {
-    if (lower.includes(keyword)) return true;
-  }
-  
-  // Check if starts with consultant action or mentions consultant doing something
-  for (const name of CONSULTANT_NAMES) {
-    if (lower.startsWith(name) || 
-        lower.includes(`${name} vai`) || 
-        lower.includes(`${name} menciona`) ||
-        lower.includes(`${name} irá`) ||
-        lower.includes(`${name} disse`) ||
-        lower.includes(`${name} laguna`)) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CAMADA 1: PROMPT REFORÇADO (Abordagem Positiva)
-// ═══════════════════════════════════════════════════════════════
-
-const BASE_SYSTEM_PROMPT = `Você é um Auditor Sênior de Vendas B2B extraindo evidências para diagnóstico comercial.
+const BASE_SYSTEM_PROMPT = `Você é um Consultor Estratégico Sênior estilo McKinsey/Deloitte especializado em transformação de vendas B2B.
 
 ═══════════════════════════════════════════════════════════════
-                    TESTE DE RELEVÂNCIA OBRIGATÓRIO
+                    SUA MISSÃO
 ═══════════════════════════════════════════════════════════════
 
-ANTES de extrair qualquer evidência, aplique este teste a CADA frase:
+Identificar GAPS DE MERCADO que impedem a empresa de atingir seu potencial de vendas.
 
-┌─────────────────────────────────────────────────────────────┐
-│ PERGUNTA 1: O sujeito da frase é o CLIENTE?                │
-│ - "O time de vendas não usa CRM" → SIM (cliente)           │
-│ - "A Vendas2B vai mapear processos" → NÃO (consultoria)    │
-│                                                             │
-│ Se NÃO → DESCARTE IMEDIATAMENTE                            │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ PERGUNTA 2: A frase descreve um FATO ATUAL ou uma          │
-│             PROMESSA FUTURA?                                │
-│ - "Usamos HubSpot desde 2022" → FATO ATUAL ✓               │
-│ - "Vamos implementar dashboards" → PROMESSA FUTURA ✗       │
-│                                                             │
-│ Se PROMESSA FUTURA → DESCARTE                              │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ PERGUNTA 3: A frase é sobre metodologia/escopo de projeto? │
-│ - "Nossa metodologia tem 5 pilares" → SIM (escopo) ✗       │
-│ - "O processo de vendas demora 45 dias" → NÃO (cliente) ✓  │
-│                                                             │
-│ Se SIM → DESCARTE                                          │
-└─────────────────────────────────────────────────────────────┘
-
-TERMOS QUE INDICAM DESCARTE AUTOMÁTICO:
-- "Vendas2B", "Vendas to Be", "V2B", "a consultoria"
-- "Luana vai...", "Luana menciona...", "João vai...", "Emília vai..."
-- "A gente vai...", "Nós vamos...", "Vamos entregar..."
-- "Nosso diagnóstico", "Nossa metodologia", "Nosso projeto"
-- "irá realizar um diagnóstico", "equipe da Vendas"
+Você NÃO extrai citações literais. Você SINTETIZA problemas estratégicos.
+Você NÃO anota fatos neutros. Você identifica BARREIRAS ao crescimento.
 
 ═══════════════════════════════════════════════════════════════
+                 O QUE É UM GAP ESTRATÉGICO?
+═══════════════════════════════════════════════════════════════
 
-PILARES DE CLASSIFICAÇÃO:
-1. Pessoas - Perfil, Skills, Motivação, Comportamento
-2. Processos - Fluxo, Gargalos, Cadência, SLA
-3. Dados - KPIs, Metas, Conversão, Métricas
-4. Tecnologia - CRM, Ferramentas, Stack, Automação
-5. Gestão & Cultura - Rituais, Crenças, Alinhamento
+Um GAP é a distância entre o estado atual e a melhor prática de mercado.
 
-REGRAS:
-- Extraia APENAS evidências que passam no teste de relevância
-- Seja factual e direto
-- Prefira frases completas e contextualizadas
-- Marque is_divergence=true se houver contradição explícita
-- Marque is_about_client=false se tiver QUALQUER dúvida sobre a origem`;
+EXEMPLO DE CONVERSÃO:
+- ❌ Citação: "O João disse que o CRM está desatualizado"
+- ❌ Micro-fato: "O time não preenche o CRM"
+- ✅ GAP: "Baixa adoção de CRM compromete visibilidade do pipeline e previsibilidade de receita"
+  - Benchmark: "Gestão centralizada de pipeline com dados limpos e atualização diária"
+  - Impacto: Receita
+  - Criticidade: Alta
+
+═══════════════════════════════════════════════════════════════
+                 REGRAS DE CONDENSAÇÃO (MENOS É MAIS)
+═══════════════════════════════════════════════════════════════
+
+1. NÃO CRIE UM GAP PARA CADA FRASE. AGRUPE problemas relacionados:
+   - Se 3 pessoas reclamam do CRM → UM ÚNICO GAP sobre tecnologia
+   - Se há problemas de follow-up e cadência → UM GAP de "Processo Comercial"
+   - Se há conflitos entre gestor e time → UM GAP de "Alinhamento de Gestão"
+
+2. IGNORE FATOS NEUTROS OU BIOGRÁFICOS:
+   - "Tatiane trabalha desde 2012" → NÃO É GAP
+   - "A empresa tem 50 funcionários" → NÃO É GAP
+   - "O escritório fica em SP" → NÃO É GAP
+   - "Usamos Salesforce" → SÓ é gap se houver PROBLEMA com isso
+
+3. FOCO EM PROBLEMAS, RISCOS E OPORTUNIDADES PERDIDAS:
+   - Só registre algo que representa perda de receita, ineficiência, risco operacional ou barreira cultural
+   - Pergunte-se: "Isso impede a empresa de vender mais?" Se não, descarte.
+
+4. LIMITE: MÁXIMO 8 GAPS POR ANÁLISE
+   - Se identificar mais de 8, priorize os de maior impacto em receita
+   - Prefira profundidade a quantidade
+
+═══════════════════════════════════════════════════════════════
+                 CRITÉRIO DE CRITICIDADE
+═══════════════════════════════════════════════════════════════
+
+ALTA (🔴):
+- Afeta diretamente a receita (perda de deals, churn, ciclo longo)
+- Impede a operação (sistema crítico quebrado, processo bloqueado)
+- Risco de compliance ou legal
+
+MÉDIA (🟡):
+- Gera ineficiência ou retrabalho significativo
+- Reduz produtividade do time
+- Afeta experiência do cliente indiretamente
+
+BAIXA (🟢):
+- Incômodo operacional menor
+- "Nice to have" sem impacto mensurável
+- Otimizações de baixa prioridade
+
+═══════════════════════════════════════════════════════════════
+                 TIPOS DE IMPACTO
+═══════════════════════════════════════════════════════════════
+
+- RECEITA: Afeta diretamente vendas, conversão, ticket médio, churn
+- EFICIENCIA: Afeta produtividade, tempo, retrabalho, custos operacionais
+- RISCO: Afeta compliance, segurança, dependência de pessoas-chave
+- CULTURA: Afeta motivação, alinhamento, resistência a mudanças
+
+═══════════════════════════════════════════════════════════════
+                 PILARES DE CLASSIFICAÇÃO
+═══════════════════════════════════════════════════════════════
+
+1. PESSOAS - Perfil, Skills, Motivação, Comportamento, Turnover
+2. PROCESSOS - Fluxo, Gargalos, Cadência, SLA, Handoffs
+3. DADOS - KPIs, Metas, Conversão, Métricas, Dashboards
+4. TECNOLOGIA - CRM, Ferramentas, Stack, Automação, Integrações
+5. GESTÃO - Rituais, Cultura, Crenças, Alinhamento, Liderança
+
+═══════════════════════════════════════════════════════════════
+                 FILTRO DE RELEVÂNCIA
+═══════════════════════════════════════════════════════════════
+
+DESCARTE AUTOMÁTICO se o conteúdo for sobre:
+- A consultoria realizando o diagnóstico (Vendas2B, V2B, etc.)
+- Ações futuras de consultores ("vamos implementar", "iremos fazer")
+- Metodologia ou escopo do projeto de consultoria
+- Promessas ou expectativas sobre o projeto
+
+FOQUE APENAS em problemas ATUAIS do CLIENTE.`;
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -265,7 +260,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log('Calling OpenAI API to analyze content...');
+    console.log('Calling OpenAI API to analyze content (Strategic Gap Analysis)...');
     console.log('Content length:', content.length);
     console.log('Has collaborator context:', !!collaboratorId);
 
@@ -279,55 +274,66 @@ Deno.serve(async (req) => {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analise este texto e extraia as evidências (lembre-se de ignorar menções à consultoria Vendas2B e focar apenas no cliente):\n\n${content}` }
+          { role: 'user', content: `Analise este texto e identifique os GAPS ESTRATÉGICOS (máximo 8). Lembre-se: você é um consultor McKinsey sintetizando problemas de alto nível, não um auditor listando citações.\n\n${content}` }
         ],
-        temperature: 0.2,
+        temperature: 0.3,
         tools: [
           {
             type: 'function',
             function: {
-              name: 'extract_evidences',
-              description: 'Extraia evidências estruturadas do texto analisado, focando APENAS no cliente. Aplique o teste de relevância a cada frase.',
+              name: 'extract_strategic_gaps',
+              description: 'Identifique gaps estratégicos que impedem a empresa de atingir seu potencial. Agrupe problemas relacionados e forneça benchmarks de mercado.',
               parameters: {
                 type: 'object',
                 properties: {
-                  evidences: {
+                  gaps: {
                     type: 'array',
+                    maxItems: 8,
                     items: {
                       type: 'object',
                       properties: {
-                        content: { 
+                        gap: { 
                           type: 'string',
-                          description: 'Descrição clara e factual da evidência em pt-BR. Deve ser sobre o CLIENTE, não sobre a consultoria.'
+                          description: 'Descrição sintética do problema estratégico em uma frase (sem aspas, narrativo). Ex: "Baixa adoção de CRM compromete visibilidade do pipeline"'
                         },
                         pilar: { 
                           type: 'string', 
                           enum: ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'],
-                          description: 'O pilar ao qual a evidência pertence'
+                          description: 'O pilar ao qual o gap pertence'
                         },
-                        is_about_client: {
-                          type: 'boolean',
-                          description: 'TRUE se a evidência é sobre o cliente. FALSE se menciona a consultoria, escopo futuro, ou ações de consultores.'
+                        benchmark: {
+                          type: 'string',
+                          description: 'Qual é a melhor prática de mercado que está faltando? Ex: "Gestão centralizada de pipeline com dados limpos e atualização diária"'
+                        },
+                        impacto: {
+                          type: 'string',
+                          enum: ['receita', 'eficiencia', 'risco', 'cultura'],
+                          description: 'Tipo de impacto principal: receita, eficiencia, risco ou cultura'
+                        },
+                        criticidade: {
+                          type: 'string',
+                          enum: ['alta', 'media', 'baixa'],
+                          description: 'Nível de criticidade baseado no impacto em receita e operação'
                         },
                         is_divergence: { 
                           type: 'boolean',
-                          description: 'Se há contradição explícita no texto'
+                          description: 'TRUE se há contradição explícita entre fontes (ex: gestor diz A, time diz B)'
                         },
                         divergence_description: { 
                           type: 'string',
-                          description: 'Explicação da divergência, se aplicável'
+                          description: 'Se is_divergence=true, descreva a contradição'
                         }
                       },
-                      required: ['content', 'pilar', 'is_about_client', 'is_divergence']
+                      required: ['gap', 'pilar', 'benchmark', 'impacto', 'criticidade', 'is_divergence']
                     }
                   }
                 },
-                required: ['evidences']
+                required: ['gaps']
               }
             }
           }
         ],
-        tool_choice: { type: 'function', function: { name: 'extract_evidences' } }
+        tool_choice: { type: 'function', function: { name: 'extract_strategic_gaps' } }
       }),
     });
 
@@ -343,51 +349,34 @@ Deno.serve(async (req) => {
 
     // Extract tool call arguments
     const toolCall = completion.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.function.name !== 'extract_evidences') {
+    if (!toolCall || toolCall.function.name !== 'extract_strategic_gaps') {
       console.error('Unexpected response format:', JSON.stringify(completion));
       throw new Error('Unexpected AI response format');
     }
 
-    let evidences;
+    let gaps;
     try {
       const args = JSON.parse(toolCall.function.arguments);
-      evidences = args.evidences;
+      gaps = args.gaps;
     } catch (parseError) {
       console.error('Failed to parse tool call arguments:', parseError);
       throw new Error('Failed to parse AI response');
     }
 
-    if (!Array.isArray(evidences)) {
-      console.error('Evidences is not an array:', evidences);
-      throw new Error('Invalid evidences format');
+    if (!Array.isArray(gaps)) {
+      console.error('Gaps is not an array:', gaps);
+      throw new Error('Invalid gaps format');
     }
 
-    console.log(`Extracted ${evidences.length} raw evidences from AI`);
+    console.log(`Extracted ${gaps.length} strategic gaps`);
 
-    // ═══════════════════════════════════════════════════════════════
-    // CAMADA 2 + 3: FILTRO PÓS-EXTRAÇÃO
-    // ═══════════════════════════════════════════════════════════════
-    
-    const filteredEvidences = evidences.filter((ev: any) => {
-      // Layer 2: Check AI's own classification
-      if (ev.is_about_client === false) {
-        console.log(`Filtered (AI marked as not client): "${ev.content.substring(0, 50)}..."`);
-        return false;
-      }
-      
-      // Layer 3: Backend keyword filter
-      if (isAboutConsultancy(ev.content)) {
-        console.log(`Filtered (keyword match): "${ev.content.substring(0, 50)}..."`);
-        return false;
-      }
-      
-      return true;
+    // Log gaps for debugging
+    gaps.forEach((gap: any, index: number) => {
+      console.log(`Gap ${index + 1}: [${gap.pilar}] ${gap.gap.substring(0, 60)}... | Criticidade: ${gap.criticidade} | Impacto: ${gap.impacto}`);
     });
 
-    console.log(`After filtering: ${filteredEvidences.length} evidences (removed ${evidences.length - filteredEvidences.length})`);
-
     return new Response(
-      JSON.stringify({ evidences: filteredEvidences, count: filteredEvidences.length }),
+      JSON.stringify({ gaps, count: gaps.length }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
