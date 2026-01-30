@@ -1,155 +1,144 @@
 
-# Plano: Elevacao do Plano Estrategico para Padrao de Auditoria
+
+# Plano: Upload em Massa na Aba Time
 
 ## Objetivo
-Transformar a tela de Plano Estrategico (`Plan.tsx`) de uma visualizacao baseada em cards para uma tabela profissional no mesmo padrao da Matriz de Gaps, com rastreabilidade entre iniciativas e gaps.
+Permitir que usuarios facam upload de multiplos arquivos de uma vez na aba Time (PDFs DISC e CSVs de clima), seguindo o mesmo padrao de fluxo de classificacao arquivo por arquivo que ja existe no Vault.
 
 ---
 
-## 1. Atualizacao do Schema do Banco de Dados
+## 1. Alteracoes no Componente de Upload
 
-A tabela `initiatives` precisa de novas colunas para suportar a rastreabilidade:
+### `src/components/team/PeopleDataUploadZone.tsx`
 
-**Novas colunas:**
-- `related_gaps` (text[]) - Array com IDs dos gaps atacados (ex: ["G01", "G03"])
-- `expected_impact` (text) - Descricao do impacto esperado (ex: "Conversao / Previsibilidade")
-- `sequential_id` (integer) - ID sequencial para exibicao (IE01, IE02...)
+**Mudancas:**
+- Alterar `multiple: false` para `multiple: true` no useDropzone
+- Atualizar texto para indicar suporte a multiplos arquivos
+- Adicionar contador de arquivos pendentes (opcional)
 
-```sql
-ALTER TABLE initiatives 
-ADD COLUMN related_gaps text[] DEFAULT '{}',
-ADD COLUMN expected_impact text,
-ADD COLUMN sequential_id integer;
 ```
+// Antes
+multiple: false,
+
+// Depois
+multiple: true,
+```
+
+**Texto atualizado:**
+- "Arraste arquivos ou clique para selecionar" (plural)
+- "PDFs DISC e CSVs de Pesquisa de Clima"
 
 ---
 
-## 2. Atualizacao da Edge Function `generate-strategic-plan`
+## 2. Novo Modal de Classificacao Sequencial
 
-### 2.1 Modificacoes no Prompt
+### `src/components/team/PeopleDataBatchModal.tsx` (Novo)
 
-**Adicionar leitura dos Gaps antes de gerar:**
-- Buscar todas as evidencias validadas com `sequential_id`
-- Passar para o prompt no formato: `G01: [descricao do gap]`
+Criar modal que processa multiplos arquivos sequencialmente, similar ao `SourceTypeModal` do Vault:
 
-**Novo System Prompt:**
-```
-Analise os Gaps identificados (G01, G02...). 
-Para cada conjunto de problemas relacionados, crie uma INICIATIVA ESTRATEGICA (IE).
-OBRIGATORIO: Liste quais IDs de Gaps (ex: G01, G03) cada iniciativa resolve.
-```
+**Funcionalidades:**
+- Exibir progresso: "Arquivo 2 de 5"
+- Para cada arquivo:
+  - Nome do arquivo atual
+  - Tipo detectado automaticamente (PDF = DISC, CSV = Clima)
+  - Selector de colaborador (apenas para DISC)
+- Botoes: "Pular", "Proximo", "Processar Todos"
 
-### 2.2 Novo Output Schema
+**Props:**
+```typescript
+interface PeopleDataBatchModalProps {
+  open: boolean;
+  files: File[];
+  collaborators: { id: string; name: string }[];
+  onProcessFiles: (classifiedFiles: ClassifiedFile[]) => Promise<void>;
+  onCancel: () => void;
+  isProcessing: boolean;
+  currentProcessingIndex: number;
+}
 
-```json
-{
-  "teamInsight": "string",
-  "initiatives": [
-    {
-      "id": "IE01",
-      "title": "Nome da Iniciativa",
-      "related_gaps": ["G01", "G03"],
-      "strategy": "Descricao tatica do que fazer",
-      "expected_impact": "Conversao / Previsibilidade",
-      "effort": "low|medium|high",
-      "target_pilar": "processos"
-    }
-  ]
+interface ClassifiedFile {
+  file: File;
+  dataType: 'perfil_disc' | 'pesquisa_clima';
+  collaboratorId?: string;
 }
 ```
 
-### 2.3 Atualizacao do Insert no Banco
-
-Mapear novos campos ao inserir:
-- `related_gaps` -> array de strings
-- `expected_impact` -> texto com metricas afetadas
-- `sequential_id` -> gerado sequencialmente (1, 2, 3...)
-
----
-
-## 3. Novos Componentes Frontend
-
-### 3.1 `InitiativeTable.tsx` (Novo)
-
-Tabela seguindo o padrao de `EvidenceTable.tsx`:
-
-**Colunas:**
-| Coluna | Descricao | Largura |
-|--------|-----------|---------|
-| Iniciativa | ID + Titulo (ex: "IE01 — Reestruturacao") | 30% |
-| Gaps Atacados | Badges cinzas (G01, G03) com Tooltip | 15% |
-| Direcionamento | Texto descritivo (strategy/description) | 35% |
-| Impacto Esperado | Texto com setas (↑ Conversao) | 15% |
-| Acoes | Dropdown menu | 5% |
-
-### 3.2 `InitiativeTableRow.tsx` (Novo)
-
-Linha individual da tabela com:
-- Formatacao do ID: `IE{sequential_id.toString().padStart(2, '0')}`
-- Badges para gaps com Tooltip mostrando descricao do gap
-- Dropdown com acoes: Aprovar, Iniciar, Concluir, Excluir
-
-### 3.3 `GapTooltip.tsx` (Novo - Opcional)
-
-Componente de Tooltip que:
-- Recebe ID do gap (ex: "G01")
-- Busca evidencia correspondente (via sequential_id)
-- Exibe: pilar + descricao do gap
-
----
-
-## 4. Atualizacoes de Arquivos Existentes
-
-### 4.1 `Plan.tsx`
-
-**Alteracoes:**
-- Substituir `InitiativeCard` por `InitiativeTable`
-- Adicionar busca de evidencias para contexto dos tooltips
-- Passar evidencias para o componente de tabela
-
-### 4.2 `useInitiatives.ts`
-
-**Alteracoes:**
-- Atualizar interface `Initiative` com novos campos:
-  - `related_gaps: string[]`
-  - `expected_impact: string | null`
-  - `sequential_id: number | null`
-- Atualizar query para ordenar por `sequential_id`
-
-### 4.3 `src/lib/types.ts`
-
-**Adicoes:**
-- `InitiativeImpactDisplay` config para labels de impacto
-
----
-
-## 5. Fluxo de Dados
-
-```text
-[Gerar Plano]
-     |
-     v
-[Edge Function: generate-strategic-plan]
-     |
-     +-- 1. Busca evidencias validadas com sequential_id
-     |
-     +-- 2. Formata como: "G01: Baixa aderencia ao CRM..."
-     |
-     +-- 3. Envia para IA com prompt atualizado
-     |
-     +-- 4. Recebe resposta com related_gaps
-     |
-     +-- 5. Salva no banco com sequential_id
-     |
-     v
-[Frontend: InitiativeTable]
-     |
-     +-- Exibe IE01, IE02...
-     |
-     +-- Badges G01, G03 com Tooltip
-     |
-     +-- Usuario ve rastreabilidade
+**UI:**
 ```
++------------------------------------------+
+|  Classificar Arquivos (2 de 5)           |
++------------------------------------------+
+|                                          |
+|  [icone] colaborador_joao.pdf            |
+|  Tipo detectado: PDF (Perfil DISC)       |
+|                                          |
+|  Vincular a colaborador:                 |
+|  [Dropdown: Joao Silva        v]         |
+|                                          |
+|  ----------------------------------------|
+|  [Pular]              [Proximo ->]       |
+|                  [Processar Todos]       |
++------------------------------------------+
+```
+
+---
+
+## 3. Atualizacao da Pagina Team
+
+### `src/pages/Team.tsx`
+
+**Novas States:**
+```typescript
+const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+const [currentFileIndex, setCurrentFileIndex] = useState(0);
+const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
+const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+const [processingProgress, setProcessingProgress] = useState(0);
+```
+
+**Atualizar `handleFilesSelected`:**
+```typescript
+const handleFilesSelected = useCallback((files: File[]) => {
+  if (files.length === 0) return;
+  
+  // Multiplos arquivos: abrir modal de classificacao em lote
+  setPendingFiles(files);
+  setCurrentFileIndex(0);
+  setClassifiedFiles([]);
+  setIsBatchModalOpen(true);
+}, []);
+```
+
+**Novo Handler de Processamento em Lote:**
+```typescript
+const handleBatchProcess = async (files: ClassifiedFile[]) => {
+  setIsProcessingFile(true);
+  
+  for (let i = 0; i < files.length; i++) {
+    setProcessingProgress(i + 1);
+    const { file, dataType, collaboratorId } = files[i];
+    
+    // Processar cada arquivo...
+    // (reutilizar logica existente)
+  }
+  
+  setIsProcessingFile(false);
+  setIsBatchModalOpen(false);
+  setPendingFiles([]);
+};
+```
+
+---
+
+## 4. Indicador de Progresso
+
+### No Modal de Classificacao
+- Barra de progresso visual
+- "Classificando 3 de 10 arquivos"
+
+### Durante o Processamento
+- Toast com progresso: "Processando arquivo 2 de 5..."
+- Feedback de sucesso consolidado ao final
 
 ---
 
@@ -159,45 +148,45 @@ Componente de Tooltip que:
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `src/components/plan/InitiativeTable.tsx` | Tabela principal de iniciativas |
-| `src/components/plan/InitiativeTableRow.tsx` | Linha individual com tooltip |
+| `src/components/team/PeopleDataBatchModal.tsx` | Modal de classificacao em lote |
 
 ### Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/pages/Plan.tsx` | Trocar cards por tabela, buscar evidencias |
-| `src/hooks/useInitiatives.ts` | Novos campos na interface |
-| `supabase/functions/generate-strategic-plan/index.ts` | Novo prompt e schema |
+| `src/components/team/PeopleDataUploadZone.tsx` | Habilitar `multiple: true` |
+| `src/pages/Team.tsx` | Adicionar estados e logica de processamento em lote |
 
-### Migracao SQL
+### Fluxo do Usuario
 
-```sql
-ALTER TABLE public.initiatives 
-ADD COLUMN IF NOT EXISTS related_gaps text[] DEFAULT '{}',
-ADD COLUMN IF NOT EXISTS expected_impact text,
-ADD COLUMN IF NOT EXISTS sequential_id integer;
-
--- Trigger para sequential_id automatico
-CREATE OR REPLACE FUNCTION set_initiative_sequential_id()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.sequential_id := COALESCE(
-    (SELECT MAX(sequential_id) + 1 FROM initiatives WHERE project_id = NEW.project_id),
-    1
-  );
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER tr_initiative_sequential_id
-BEFORE INSERT ON initiatives
-FOR EACH ROW
-WHEN (NEW.sequential_id IS NULL)
-EXECUTE FUNCTION set_initiative_sequential_id();
+```
+1. Usuario arrasta 5 PDFs DISC
+         |
+         v
+2. Modal abre: "Classificar Arquivos (1 de 5)"
+         |
+   +-----+-----+
+   |           |
+   v           v
+3a. Classifica   3b. "Processar Todos"
+    um por um        (auto-detecta tipo)
+         |           |
+         v           v
+4. Processamento em paralelo com feedback
+         |
+         v
+5. Toast: "5 colaboradores processados com sucesso"
 ```
 
 ### Dependencias
 
-- Nenhuma nova dependencia necessaria
-- Reutiliza componentes Table, Badge, Tooltip do shadcn/ui
+- Nenhuma nova dependencia
+- Reutiliza componentes Dialog, Progress, Button do shadcn/ui
+
+### Inteligencia de Deteccao Automatica
+
+Para "Processar Todos" sem classificar um por um:
+- `.pdf` -> `perfil_disc`
+- `.csv` -> `pesquisa_clima`
+- Sem vinculo a colaborador (criar novos automaticamente)
+
