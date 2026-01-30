@@ -12,7 +12,10 @@ export type SourceType =
   | 'reuniao_kickoff'
   | 'reuniao_vendas'
   | 'briefing'
-  | 'documentacao';
+  | 'documentacao'
+  | 'observacao_consultor';
+
+export type EvidenceType = 'fato' | 'divergencia' | 'ponto_forte';
 
 export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> = {
   entrevista_diretoria: { label: 'Entrevista (CEO/Diretoria)', icon: '🎤' },
@@ -21,6 +24,13 @@ export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> =
   reuniao_vendas: { label: 'Reunião de Vendas (Gravada)', icon: '📞' },
   briefing: { label: 'Briefing / Formulário', icon: '📝' },
   documentacao: { label: 'Documentação Técnica', icon: '📄' },
+  observacao_consultor: { label: 'Observação do Consultor', icon: '👁️' },
+};
+
+export const EVIDENCE_TYPES: Record<EvidenceType, { label: string; icon: string; color: string }> = {
+  fato: { label: 'Fato', icon: '📌', color: 'bg-primary/10 text-primary border-primary/30' },
+  divergencia: { label: 'Divergência', icon: '⚠️', color: 'bg-warning/10 text-warning border-warning/30' },
+  ponto_forte: { label: 'Ponto Forte', icon: '✨', color: 'bg-success/10 text-success border-success/30' },
 };
 
 export interface Project {
@@ -29,6 +39,9 @@ export interface Project {
   client_name: string;
   description?: string;
   start_date: string;
+  client_context?: string;
+  main_pain_points?: string;
+  project_goals?: string;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +73,7 @@ export interface Evidence {
   status: EvidenceStatus;
   is_divergence: boolean;
   divergence_description?: string;
+  evidence_type?: EvidenceType;
   notes?: string;
   created_at: string;
   updated_at: string;

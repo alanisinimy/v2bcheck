@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, FileText, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Calendar, FileText, CheckCircle, Clock, AlertTriangle, BarChart3, Info } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
+import { ProjectOverviewForm } from '@/components/dashboard/ProjectOverviewForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEvidences } from '@/hooks/useProject';
 import type { Pilar } from '@/lib/types';
@@ -62,7 +65,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-          className="mb-8"
+          className="mb-6"
         >
           <h1 className="text-3xl font-bold text-foreground mb-2">
             {currentProject.client_name}
@@ -76,90 +79,112 @@ export default function Dashboard() {
           </div>
         </motion.header>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <StatsCard
-            title="Total de Evidências"
-            value={mockStats.total}
-            icon={FileText}
-            index={0}
-          />
-          <StatsCard
-            title="Validadas"
-            value={mockStats.byStatus?.validado || 0}
-            icon={CheckCircle}
-            variant="success"
-            index={1}
-          />
-          <StatsCard
-            title="Pendentes"
-            value={mockStats.byStatus?.pendente || 0}
-            icon={Clock}
-            index={2}
-          />
-          <StatsCard
-            title="Divergências"
-            value={mockStats.divergences}
-            icon={AlertTriangle}
-            variant="warning"
-            index={3}
-          />
-        </div>
+        {/* Tabs */}
+        <Tabs defaultValue="metricas" className="space-y-6">
+          <TabsList className="bg-muted/50 p-1">
+            <TabsTrigger value="metricas" className="gap-2 data-[state=active]:bg-background">
+              <BarChart3 className="w-4 h-4" />
+              Métricas
+            </TabsTrigger>
+            <TabsTrigger value="visao-geral" className="gap-2 data-[state=active]:bg-background">
+              <Info className="w-4 h-4" />
+              Visão Geral
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Pilares Grid */}
-        <motion.h2
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-xl font-semibold text-foreground mb-4"
-        >
-          Saturação por Pilar
-        </motion.h2>
-        
-        <div className="grid grid-cols-5 gap-4">
-          {pilares.map((pilar, index) => (
-            <MetricCard
-              key={pilar}
-              pilar={pilar}
-              count={mockStats.byPilar?.[pilar] || 0}
-              total={mockStats.total}
-              index={index}
-            />
-          ))}
-        </div>
+          {/* Metrics Tab */}
+          <TabsContent value="metricas" className="space-y-6">
+            {/* Stats Row */}
+            <div className="grid grid-cols-4 gap-4">
+              <StatsCard
+                title="Total de Evidências"
+                value={mockStats.total}
+                icon={FileText}
+                index={0}
+              />
+              <StatsCard
+                title="Validadas"
+                value={mockStats.byStatus?.validado || 0}
+                icon={CheckCircle}
+                variant="success"
+                index={1}
+              />
+              <StatsCard
+                title="Pendentes"
+                value={mockStats.byStatus?.pendente || 0}
+                icon={Clock}
+                index={2}
+              />
+              <StatsCard
+                title="Divergências"
+                value={mockStats.divergences}
+                icon={AlertTriangle}
+                variant="warning"
+                index={3}
+              />
+            </div>
 
-        {/* Insights Section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="mt-8 bg-card rounded-2xl p-6 border border-border/50 shadow-soft"
-        >
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-warning" />
-            Divergências Detectadas
-          </h2>
-          <div className="space-y-3">
-            <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-              <p className="text-foreground">
-                <span className="font-medium">Tecnologia vs Operação:</span> Gestor comercial alega uso de Salesforce, 
-                mas time relata uso de planilhas.
-              </p>
+            {/* Pilares Grid */}
+            <motion.h2
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-xl font-semibold text-foreground"
+            >
+              Saturação por Pilar
+            </motion.h2>
+            
+            <div className="grid grid-cols-5 gap-4">
+              {pilares.map((pilar, index) => (
+                <MetricCard
+                  key={pilar}
+                  pilar={pilar}
+                  count={mockStats.byPilar?.[pilar] || 0}
+                  total={mockStats.total}
+                  index={index}
+                />
+              ))}
             </div>
-            <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-              <p className="text-foreground">
-                <span className="font-medium">Dados vs Realidade:</span> Meta de crescimento de 40% sem 
-                histórico de contratações planejadas.
-              </p>
-            </div>
-            <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-              <p className="text-foreground">
-                <span className="font-medium">Gestão vs Execução:</span> Reunião de pipeline ocorre às segundas, 
-                mas 60% do time falta.
-              </p>
-            </div>
-          </div>
-        </motion.section>
+
+            {/* Insights Section */}
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.4 }}
+              className="bg-card rounded-2xl p-6 border border-border/50 shadow-soft"
+            >
+              <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-warning" />
+                Divergências Detectadas
+              </h2>
+              <div className="space-y-3">
+                <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
+                  <p className="text-foreground">
+                    <span className="font-medium">Tecnologia vs Operação:</span> Gestor comercial alega uso de Salesforce, 
+                    mas time relata uso de planilhas.
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
+                  <p className="text-foreground">
+                    <span className="font-medium">Dados vs Realidade:</span> Meta de crescimento de 40% sem 
+                    histórico de contratações planejadas.
+                  </p>
+                </div>
+                <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
+                  <p className="text-foreground">
+                    <span className="font-medium">Gestão vs Execução:</span> Reunião de pipeline ocorre às segundas, 
+                    mas 60% do time falta.
+                  </p>
+                </div>
+              </div>
+            </motion.section>
+          </TabsContent>
+
+          {/* Overview Tab */}
+          <TabsContent value="visao-geral">
+            <ProjectOverviewForm project={currentProject} />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
