@@ -130,15 +130,19 @@ export type Database = {
       evidences: {
         Row: {
           asset_id: string | null
+          benchmark: string | null
           content: string
           created_at: string
+          criticality: string | null
           divergence_description: string | null
           evidence_type: Database["public"]["Enums"]["evidence_type"] | null
           id: string
+          impact: string | null
           is_divergence: boolean
           notes: string | null
           pilar: Database["public"]["Enums"]["pilar"]
           project_id: string
+          sequential_id: number | null
           source_description: string | null
           status: Database["public"]["Enums"]["evidence_status"]
           timecode_end: number | null
@@ -147,15 +151,19 @@ export type Database = {
         }
         Insert: {
           asset_id?: string | null
+          benchmark?: string | null
           content: string
           created_at?: string
+          criticality?: string | null
           divergence_description?: string | null
           evidence_type?: Database["public"]["Enums"]["evidence_type"] | null
           id?: string
+          impact?: string | null
           is_divergence?: boolean
           notes?: string | null
           pilar: Database["public"]["Enums"]["pilar"]
           project_id: string
+          sequential_id?: number | null
           source_description?: string | null
           status?: Database["public"]["Enums"]["evidence_status"]
           timecode_end?: number | null
@@ -164,15 +172,19 @@ export type Database = {
         }
         Update: {
           asset_id?: string | null
+          benchmark?: string | null
           content?: string
           created_at?: string
+          criticality?: string | null
           divergence_description?: string | null
           evidence_type?: Database["public"]["Enums"]["evidence_type"] | null
           id?: string
+          impact?: string | null
           is_divergence?: boolean
           notes?: string | null
           pilar?: Database["public"]["Enums"]["pilar"]
           project_id?: string
+          sequential_id?: number | null
           source_description?: string | null
           status?: Database["public"]["Enums"]["evidence_status"]
           timecode_end?: number | null

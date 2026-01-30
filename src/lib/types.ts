@@ -18,6 +18,10 @@ export type SourceType =
 
 export type EvidenceType = 'fato' | 'divergencia' | 'ponto_forte';
 
+export type ImpactType = 'receita' | 'eficiencia' | 'risco';
+
+export type CriticalityType = 'alta' | 'media' | 'baixa';
+
 export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> = {
   entrevista_diretoria: { label: 'Entrevista (CEO/Diretoria)', icon: '🎤' },
   entrevista_operacao: { label: 'Entrevista (Time/Operação)', icon: '👥' },
@@ -33,6 +37,18 @@ export const EVIDENCE_TYPES: Record<EvidenceType, { label: string; icon: string;
   fato: { label: 'Fato', icon: '📌', color: 'bg-primary/10 text-primary border-primary/30' },
   divergencia: { label: 'Divergência', icon: '⚠️', color: 'bg-warning/10 text-warning border-warning/30' },
   ponto_forte: { label: 'Ponto Forte', icon: '✨', color: 'bg-success/10 text-success border-success/30' },
+};
+
+export const IMPACT_CONFIG: Record<ImpactType, { label: string; icon: string }> = {
+  receita: { label: 'Receita', icon: 'TrendingUp' },
+  eficiencia: { label: 'Eficiência', icon: 'Zap' },
+  risco: { label: 'Risco', icon: 'AlertTriangle' },
+};
+
+export const CRITICALITY_CONFIG: Record<CriticalityType, { label: string; color: string }> = {
+  alta: { label: 'Alta', color: 'bg-destructive/15 text-destructive border-destructive/30' },
+  media: { label: 'Média', color: 'bg-warning/15 text-warning border-warning/30' },
+  baixa: { label: 'Baixa', color: 'bg-success/15 text-success border-success/30' },
 };
 
 export interface Project {
@@ -78,6 +94,10 @@ export interface Evidence {
   divergence_description?: string;
   evidence_type?: EvidenceType;
   notes?: string;
+  benchmark?: string;
+  impact?: ImpactType;
+  criticality?: CriticalityType;
+  sequential_id?: number;
   created_at: string;
   updated_at: string;
 }
