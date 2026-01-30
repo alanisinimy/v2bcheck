@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, FileText, CheckCircle, Clock, AlertTriangle, BarChart3, Info } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -8,32 +7,21 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ProjectOverviewForm } from '@/components/dashboard/ProjectOverviewForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useEvidences } from '@/hooks/useProject';
+import { useProjectStats, useEvidences } from '@/hooks/useProject';
 import type { Pilar } from '@/lib/types';
 import { PILARES } from '@/lib/types';
 
 export default function Dashboard() {
   const { currentProject, isLoading } = useProjectContext();
-  const { data: evidences } = useEvidences(currentProject?.id || '');
+  
+  // Dados reais do Supabase
+  const stats = useProjectStats(currentProject?.id);
+  const { data: evidences } = useEvidences(currentProject?.id);
 
-  // Mock stats for demo
-  const mockStats = {
-    total: 24,
-    byPilar: {
-      pessoas: 6,
-      processos: 5,
-      dados: 4,
-      tecnologia: 5,
-      gestao: 4,
-    } as Record<Pilar, number>,
-    byStatus: {
-      pendente: 12,
-      validado: 8,
-      rejeitado: 2,
-      investigar: 2,
-    },
-    divergences: 3,
-  };
+  // Filtrar divergências reais (is_divergence=true ou evidence_type='divergencia')
+  const recentDivergences = evidences
+    ?.filter(ev => ev.is_divergence || ev.evidence_type === 'divergencia')
+    .slice(0, 5) || [];
 
   const pilares: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
 
@@ -98,26 +86,26 @@ export default function Dashboard() {
             <div className="grid grid-cols-4 gap-4">
               <StatsCard
                 title="Total de Evidências"
-                value={mockStats.total}
+                value={stats.total}
                 icon={FileText}
                 index={0}
               />
               <StatsCard
                 title="Validadas"
-                value={mockStats.byStatus?.validado || 0}
+                value={stats.byStatus?.validado || 0}
                 icon={CheckCircle}
                 variant="success"
                 index={1}
               />
               <StatsCard
                 title="Pendentes"
-                value={mockStats.byStatus?.pendente || 0}
+                value={stats.byStatus?.pendente || 0}
                 icon={Clock}
                 index={2}
               />
               <StatsCard
                 title="Divergências"
-                value={mockStats.divergences}
+                value={stats.divergences}
                 icon={AlertTriangle}
                 variant="warning"
                 index={3}
@@ -139,8 +127,8 @@ export default function Dashboard() {
                 <MetricCard
                   key={pilar}
                   pilar={pilar}
-                  count={mockStats.byPilar?.[pilar] || 0}
-                  total={mockStats.total}
+                  count={stats.byPilar?.[pilar] || 0}
+                  total={stats.total}
                   index={index}
                 />
               ))}
@@ -158,24 +146,20 @@ export default function Dashboard() {
                 Divergências Detectadas
               </h2>
               <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-                  <p className="text-foreground">
-                    <span className="font-medium">Tecnologia vs Operação:</span> Gestor comercial alega uso de Salesforce, 
-                    mas time relata uso de planilhas.
+                {recentDivergences.length === 0 ? (
+                  <p className="text-muted-foreground text-sm py-4 text-center">
+                    Nenhuma divergência detectada ainda.
                   </p>
-                </div>
-                <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-                  <p className="text-foreground">
-                    <span className="font-medium">Dados vs Realidade:</span> Meta de crescimento de 40% sem 
-                    histórico de contratações planejadas.
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-                  <p className="text-foreground">
-                    <span className="font-medium">Gestão vs Execução:</span> Reunião de pipeline ocorre às segundas, 
-                    mas 60% do time falta.
-                  </p>
-                </div>
+                ) : (
+                  recentDivergences.map((div) => (
+                    <div key={div.id} className="p-4 rounded-xl bg-warning/5 border border-warning/20">
+                      <p className="text-foreground">
+                        <span className="font-medium capitalize">{div.pilar}:</span>{' '}
+                        {div.divergence_description || div.content}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </motion.section>
           </TabsContent>
