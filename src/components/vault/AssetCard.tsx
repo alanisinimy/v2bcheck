@@ -3,8 +3,10 @@ import { motion } from 'framer-motion';
 import { FileAudio, FileVideo, FileText, FileSpreadsheet, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/lib/types';
+import { SOURCE_TYPES } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,10 +97,18 @@ export function AssetCard({ asset, index, onDelete, isDeleting }: AssetCardProps
       {/* File Info */}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-foreground truncate">{asset.file_name}</p>
-        <p className="text-sm text-muted-foreground">
-          {formatFileSize(asset.file_size)}
-          {asset.duration_seconds && ` • ${Math.floor(asset.duration_seconds / 60)}min`}
-        </p>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>{formatFileSize(asset.file_size)}</span>
+          {asset.duration_seconds && <span>• {Math.floor(asset.duration_seconds / 60)}min</span>}
+          {asset.source_type && (
+            <>
+              <span>•</span>
+              <Badge variant="outline" className="text-xs font-normal">
+                {SOURCE_TYPES[asset.source_type].icon} {SOURCE_TYPES[asset.source_type].label}
+              </Badge>
+            </>
+          )}
+        </div>
         
         {/* Processing skeleton */}
         {asset.status === 'processing' && (

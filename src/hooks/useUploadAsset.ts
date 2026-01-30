@@ -1,17 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Asset } from '@/lib/types';
+import type { Asset, SourceType } from '@/lib/types';
 
 interface UploadAssetData {
   projectId: string;
   file: File;
+  sourceType: SourceType;
 }
 
 export function useUploadAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ projectId, file }: UploadAssetData) => {
+    mutationFn: async ({ projectId, file, sourceType }: UploadAssetData) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}/${Date.now()}.${fileExt}`;
 
@@ -32,6 +33,7 @@ export function useUploadAsset() {
           file_size: file.size,
           storage_path: fileName,
           status: 'processing',
+          source_type: sourceType,
         })
         .select()
         .single();
