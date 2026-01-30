@@ -1,10 +1,23 @@
 import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckSquare, X, Trash2, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { FileUploadZone } from '@/components/vault/FileUploadZone';
 import { AssetCard } from '@/components/vault/AssetCard';
 import { SourceTypeModal } from '@/components/vault/SourceTypeModal';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useAssets, useDeleteAsset } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
@@ -29,6 +42,12 @@ export default function Vault() {
   const [isUploading, setIsUploading] = useState(false);
   const [processingMessage, setProcessingMessage] = useState<string | null>(null);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
+  
+  // Selection mode state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   
   // Classification modal state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -113,7 +132,7 @@ export default function Vault() {
             } else {
               toast({
                 title: 'IA processou o arquivo',
-                description: `${result.count} evidências extraídas de ${file.name}.`,
+                description: `${result.count} gaps extraídos de ${file.name}.`,
               });
             }
           }
@@ -208,8 +227,78 @@ export default function Vault() {
     }
   }, [currentProject, deleteAssetMutation]);
 
+  // Selection handlers
+  const toggleSelectionMode = useCallback(() => {
+    setIsSelectionMode(prev => !prev);
+    setSelectedAssets(new Set());
+  }, []);
+
+  const handleSelectionChange = useCallback((assetId: string, selected: boolean) => {
+    setSelectedAssets(prev => {
+      const next = new Set(prev);
+      if (selected) {
+        next.add(assetId);
+      } else {
+        next.delete(assetId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedAssets.size === assets.length) {
+      setSelectedAssets(new Set());
+    } else {
+      setSelectedAssets(new Set(assets.map(a => a.id)));
+    }
+  }, [assets, selectedAssets.size]);
+
+  const handleBulkDelete = useCallback(async () => {
+    if (!currentProject || selectedAssets.size === 0) return;
+    
+    setIsBulkDeleting(true);
+    setShowBulkDeleteDialog(false);
+    
+    const assetsToDelete = assets.filter(a => selectedAssets.has(a.id));
+    let deletedCount = 0;
+    let errorCount = 0;
+    
+    for (const asset of assetsToDelete) {
+      try {
+        await deleteAssetMutation.mutateAsync({
+          assetId: asset.id,
+          storagePath: asset.storage_path,
+          projectId: currentProject.id,
+        });
+        deletedCount++;
+      } catch (error) {
+        console.error('Delete error for asset:', asset.id, error);
+        errorCount++;
+      }
+    }
+    
+    setIsBulkDeleting(false);
+    setSelectedAssets(new Set());
+    setIsSelectionMode(false);
+    
+    if (errorCount === 0) {
+      toast({
+        title: 'Arquivos excluídos',
+        description: `${deletedCount} arquivo(s) e suas evidências foram removidos.`,
+      });
+    } else {
+      toast({
+        title: 'Exclusão parcial',
+        description: `${deletedCount} excluído(s), ${errorCount} erro(s).`,
+        variant: 'destructive',
+      });
+    }
+  }, [currentProject, selectedAssets, assets, deleteAssetMutation]);
+
   const isLoading = isLoadingProject || isLoadingAssets;
   const currentFileName = pendingFiles[currentFileIndex]?.name || '';
+  const allSelected = assets.length > 0 && selectedAssets.size === assets.length;
+  const someSelected = selectedAssets.size > 0 && selectedAssets.size < assets.length;
 
   // Show loading state
   if (isLoading) {
@@ -283,9 +372,84 @@ export default function Vault() {
           transition={{ delay: 0.2 }}
           className="mt-8"
         >
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Arquivos Processados ({assets.length})
-          </h2>
+          {/* Section Header with Selection Toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground">
+              Arquivos Processados ({assets.length})
+            </h2>
+            
+            {assets.length > 0 && (
+              <Button
+                variant={isSelectionMode ? "secondary" : "outline"}
+                size="sm"
+                onClick={toggleSelectionMode}
+                className="gap-2"
+              >
+                {isSelectionMode ? (
+                  <>
+                    <X className="w-4 h-4" />
+                    Cancelar
+                  </>
+                ) : (
+                  <>
+                    <CheckSquare className="w-4 h-4" />
+                    Selecionar
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Bulk Actions Bar */}
+          <AnimatePresence>
+            {isSelectionMode && assets.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 overflow-hidden"
+              >
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) {
+                          (el as any).indeterminate = someSelected;
+                        }
+                      }}
+                      onCheckedChange={handleSelectAll}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {selectedAssets.size === 0 
+                        ? 'Nenhum selecionado' 
+                        : `${selectedAssets.size} de ${assets.length} selecionado(s)`}
+                    </span>
+                  </div>
+                  
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={selectedAssets.size === 0 || isBulkDeleting}
+                    onClick={() => setShowBulkDeleteDialog(true)}
+                    className="gap-2"
+                  >
+                    {isBulkDeleting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Excluindo...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        Excluir ({selectedAssets.size})
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           <div className="space-y-3">
             {assets.map((asset, index) => (
@@ -295,6 +459,9 @@ export default function Vault() {
                 index={index}
                 onDelete={handleDeleteAsset}
                 isDeleting={deletingAssetId === asset.id}
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedAssets.has(asset.id)}
+                onSelectionChange={handleSelectionChange}
               />
             ))}
           </div>
@@ -305,6 +472,27 @@ export default function Vault() {
             </div>
           )}
         </motion.section>
+
+        {/* Bulk Delete Confirmation Dialog */}
+        <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir {selectedAssets.size} arquivo(s)?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita. Todos os arquivos selecionados e suas evidências associadas serão permanentemente excluídos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBulkDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir {selectedAssets.size} arquivo(s)
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
