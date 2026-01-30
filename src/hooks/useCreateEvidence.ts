@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Evidence, Pilar, EvidenceStatus } from '@/lib/types';
+import type { Evidence, Pilar, EvidenceStatus, EvidenceType } from '@/lib/types';
 
 interface CreateEvidenceData {
   project_id: string;
@@ -10,6 +10,7 @@ interface CreateEvidenceData {
   status?: EvidenceStatus;
   is_divergence?: boolean;
   divergence_description?: string;
+  evidence_type?: EvidenceType;
   asset_id?: string;
   timecode_start?: number;
   timecode_end?: number;
@@ -30,6 +31,7 @@ export function useCreateEvidence() {
           status: data.status || 'pendente',
           is_divergence: data.is_divergence || false,
           divergence_description: data.divergence_description,
+          evidence_type: data.evidence_type || 'fato',
           asset_id: data.asset_id,
           timecode_start: data.timecode_start,
           timecode_end: data.timecode_end,

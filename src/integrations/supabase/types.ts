@@ -73,6 +73,7 @@ export type Database = {
           content: string
           created_at: string
           divergence_description: string | null
+          evidence_type: Database["public"]["Enums"]["evidence_type"] | null
           id: string
           is_divergence: boolean
           notes: string | null
@@ -89,6 +90,7 @@ export type Database = {
           content: string
           created_at?: string
           divergence_description?: string | null
+          evidence_type?: Database["public"]["Enums"]["evidence_type"] | null
           id?: string
           is_divergence?: boolean
           notes?: string | null
@@ -105,6 +107,7 @@ export type Database = {
           content?: string
           created_at?: string
           divergence_description?: string | null
+          evidence_type?: Database["public"]["Enums"]["evidence_type"] | null
           id?: string
           is_divergence?: boolean
           notes?: string | null
@@ -135,29 +138,38 @@ export type Database = {
       }
       projects: {
         Row: {
+          client_context: string | null
           client_name: string
           created_at: string
           description: string | null
           id: string
+          main_pain_points: string | null
           name: string
+          project_goals: string | null
           start_date: string
           updated_at: string
         }
         Insert: {
+          client_context?: string | null
           client_name: string
           created_at?: string
           description?: string | null
           id?: string
+          main_pain_points?: string | null
           name: string
+          project_goals?: string | null
           start_date?: string
           updated_at?: string
         }
         Update: {
+          client_context?: string | null
           client_name?: string
           created_at?: string
           description?: string | null
           id?: string
+          main_pain_points?: string | null
           name?: string
+          project_goals?: string | null
           start_date?: string
           updated_at?: string
         }
@@ -173,6 +185,7 @@ export type Database = {
     Enums: {
       asset_status: "uploading" | "processing" | "completed" | "error"
       evidence_status: "pendente" | "validado" | "rejeitado" | "investigar"
+      evidence_type: "fato" | "divergencia" | "ponto_forte"
       pilar: "pessoas" | "processos" | "dados" | "tecnologia" | "gestao"
       source_type:
         | "entrevista_diretoria"
@@ -181,6 +194,7 @@ export type Database = {
         | "reuniao_vendas"
         | "briefing"
         | "documentacao"
+        | "observacao_consultor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -310,6 +324,7 @@ export const Constants = {
     Enums: {
       asset_status: ["uploading", "processing", "completed", "error"],
       evidence_status: ["pendente", "validado", "rejeitado", "investigar"],
+      evidence_type: ["fato", "divergencia", "ponto_forte"],
       pilar: ["pessoas", "processos", "dados", "tecnologia", "gestao"],
       source_type: [
         "entrevista_diretoria",
@@ -318,6 +333,7 @@ export const Constants = {
         "reuniao_vendas",
         "briefing",
         "documentacao",
+        "observacao_consultor",
       ],
     },
   },

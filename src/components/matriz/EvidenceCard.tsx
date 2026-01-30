@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Evidence, EvidenceStatus } from '@/lib/types';
-import { PILARES } from '@/lib/types';
+import { PILARES, EVIDENCE_TYPES } from '@/lib/types';
 
 interface EvidenceCardProps {
   evidence: Evidence;
@@ -54,7 +54,7 @@ export function EvidenceCard({ evidence, onStatusChange, index }: EvidenceCardPr
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-lg">{config.icon}</span>
           <Badge 
             variant="secondary" 
@@ -62,7 +62,16 @@ export function EvidenceCard({ evidence, onStatusChange, index }: EvidenceCardPr
           >
             {config.label}
           </Badge>
-          {evidence.is_divergence && (
+          {evidence.evidence_type && evidence.evidence_type !== 'fato' && (
+            <Badge 
+              variant="outline" 
+              className={cn('gap-1', EVIDENCE_TYPES[evidence.evidence_type].color)}
+            >
+              <span>{EVIDENCE_TYPES[evidence.evidence_type].icon}</span>
+              {EVIDENCE_TYPES[evidence.evidence_type].label}
+            </Badge>
+          )}
+          {evidence.is_divergence && !evidence.evidence_type && (
             <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 gap-1">
               <AlertTriangle className="w-3 h-3" />
               Divergência
