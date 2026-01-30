@@ -6,13 +6,14 @@ interface UploadAssetData {
   projectId: string;
   file: File;
   sourceType: SourceType;
+  collaboratorId?: string;
 }
 
 export function useUploadAsset() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ projectId, file, sourceType }: UploadAssetData) => {
+    mutationFn: async ({ projectId, file, sourceType, collaboratorId }: UploadAssetData) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${projectId}/${Date.now()}.${fileExt}`;
 
@@ -34,6 +35,7 @@ export function useUploadAsset() {
           storage_path: fileName,
           status: 'processing',
           source_type: sourceType,
+          collaborator_id: collaboratorId || null,
         })
         .select()
         .single();

@@ -16,6 +16,7 @@ import type { SourceType } from '@/lib/types';
 interface PendingFile {
   file: File;
   sourceType?: SourceType;
+  collaboratorId?: string | null;
 }
 
 export default function Vault() {
@@ -40,7 +41,7 @@ export default function Vault() {
     
     setIsUploading(true);
     
-    for (const { file, sourceType } of files) {
+    for (const { file, sourceType, collaboratorId } of files) {
       if (!sourceType) continue;
       
       try {
@@ -50,6 +51,7 @@ export default function Vault() {
           projectId: currentProject.id,
           file,
           sourceType,
+          collaboratorId: collaboratorId || undefined,
         });
 
         toast({
@@ -152,9 +154,9 @@ export default function Vault() {
     setIsModalOpen(true);
   }, []);
 
-  const handleSourceTypeConfirm = useCallback((sourceType: SourceType) => {
+  const handleSourceTypeConfirm = useCallback((sourceType: SourceType, collaboratorId: string | null) => {
     const currentFile = pendingFiles[currentFileIndex];
-    const newClassified = [...classifiedFiles, { file: currentFile, sourceType }];
+    const newClassified = [...classifiedFiles, { file: currentFile, sourceType, collaboratorId }];
     
     if (currentFileIndex < pendingFiles.length - 1) {
       // More files to classify
@@ -254,6 +256,7 @@ export default function Vault() {
         <SourceTypeModal
           isOpen={isModalOpen}
           fileName={currentFileName}
+          projectId={currentProject.id}
           onConfirm={handleSourceTypeConfirm}
           onCancel={handleSourceTypeCancel}
         />

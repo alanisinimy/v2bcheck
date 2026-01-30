@@ -57,6 +57,7 @@ export interface Asset {
   storage_path: string;
   status: AssetStatus;
   source_type?: SourceType;
+  collaborator_id?: string;
   duration_seconds?: number;
   metadata?: Record<string, unknown>;
   created_at: string;

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       assets: {
         Row: {
+          collaborator_id: string | null
           created_at: string
           duration_seconds: number | null
           file_name: string
@@ -30,6 +31,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          collaborator_id?: string | null
           created_at?: string
           duration_seconds?: number | null
           file_name: string
@@ -44,6 +46,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          collaborator_id?: string | null
           created_at?: string
           duration_seconds?: number | null
           file_name?: string
@@ -58,6 +61,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "assets_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "assets_project_id_fkey"
             columns: ["project_id"]
