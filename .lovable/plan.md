@@ -1,148 +1,154 @@
 
-# Plano de Implementacao: 3 Itens Pendentes do Plano Mestre V2.0
+# Plano: Elevacao do Plano Estrategico para Padrao de Auditoria
 
-## Resumo Executivo
-
-Este plano detalha a implementacao de tres funcionalidades pendentes:
-1. **Nota Tecnica no Vault** - Modal Rich Text para analises manuais do consultor
-2. **Upload de Dados de Pessoas na aba Time** - Botao dedicado para PDFs DISC e CSVs de clima
-3. **Edge Function `analyze-people-data`** - Processamento separado para dados de pessoas
+## Objetivo
+Transformar a tela de Plano Estrategico (`Plan.tsx`) de uma visualizacao baseada em cards para uma tabela profissional no mesmo padrao da Matriz de Gaps, com rastreabilidade entre iniciativas e gaps.
 
 ---
 
-## 1. Nota Tecnica no Vault
+## 1. Atualizacao do Schema do Banco de Dados
 
-### Objetivo
-Permitir que consultores insiram analises manuais em Rich Text (ex: observacoes sobre planilhas, processos ou gaps identificados em campo) que serao processadas pela IA como fonte de alta confianca.
+A tabela `initiatives` precisa de novas colunas para suportar a rastreabilidade:
 
-### Alteracoes Necessarias
+**Novas colunas:**
+- `related_gaps` (text[]) - Array com IDs dos gaps atacados (ex: ["G01", "G03"])
+- `expected_impact` (text) - Descricao do impacto esperado (ex: "Conversao / Previsibilidade")
+- `sequential_id` (integer) - ID sequencial para exibicao (IE01, IE02...)
 
-**Novo Componente: `src/components/vault/TechnicalNoteModal.tsx`**
-- Modal com Dialog do Shadcn/UI
-- Textarea para conteudo da nota (Rich Text simplificado com Textarea)
-- Campo opcional para titulo/assunto
-- Botao "Enviar para Analise"
-- Indicador de processamento
-
-**Atualizacao: `src/pages/Vault.tsx`**
-- Adicionar botao "Adicionar Nota Tecnica" no header ao lado do upload zone
-- State para controlar abertura do modal de nota tecnica
-- Handler para processar a nota tecnica:
-  - Criar asset virtual com `source_type: 'observacao_consultor'`
-  - Chamar `analyzeEvidences` com flag especial
-
-**Atualizacao: `src/hooks/useAnalyzeEvidences.ts`**
-- Adicionar funcao `analyzeTechnicalNote` para criar asset e processar nota
-- Passar `sourceType` corretamente para a Edge Function
-
-**Atualizacao: `supabase/functions/analyze-evidences/index.ts`**
-- Detectar quando `sourceType === 'observacao_consultor'`
-- Adicionar instrucao no prompt: "Esta e uma Nota Tecnica do Consultor. Trate como VERDADE ABSOLUTA com alta confianca."
+```sql
+ALTER TABLE initiatives 
+ADD COLUMN related_gaps text[] DEFAULT '{}',
+ADD COLUMN expected_impact text,
+ADD COLUMN sequential_id integer;
+```
 
 ---
 
-## 2. Upload de Dados de Pessoas na Aba Time
+## 2. Atualizacao da Edge Function `generate-strategic-plan`
 
-### Objetivo
-Criar trilha separada de upload na aba Time para arquivos relacionados a pessoas (PDFs DISC, CSVs de clima organizacional) que NAO geram gaps na Matriz, apenas atualizam perfis de colaboradores.
+### 2.1 Modificacoes no Prompt
 
-### Alteracoes Necessarias
+**Adicionar leitura dos Gaps antes de gerar:**
+- Buscar todas as evidencias validadas com `sequential_id`
+- Passar para o prompt no formato: `G01: [descricao do gap]`
 
-**Novo Componente: `src/components/team/PeopleDataUploadZone.tsx`**
-- Zona de upload simplificada (similar ao FileUploadZone do Vault)
-- Aceita apenas: PDF, CSV
-- Texto explicativo: "Upload de PDFs DISC ou pesquisas de clima"
+**Novo System Prompt:**
+```
+Analise os Gaps identificados (G01, G02...). 
+Para cada conjunto de problemas relacionados, crie uma INICIATIVA ESTRATEGICA (IE).
+OBRIGATORIO: Liste quais IDs de Gaps (ex: G01, G03) cada iniciativa resolve.
+```
 
-**Novo Componente: `src/components/team/PeopleDataTypeModal.tsx`**
-- Modal para classificar o tipo do arquivo:
-  - `perfil_disc` - PDF de perfil DISC individual
-  - `pesquisa_clima` - CSV de pesquisa de clima organizacional
-- Campo opcional para vincular a colaborador existente
+### 2.2 Novo Output Schema
 
-**Atualizacao: `src/pages/Team.tsx`**
-- Adicionar botao "Upload Dados de Pessoas" no header
-- Estado para controlar modais de upload
-- Handler para processar arquivos:
-  - PDFs DISC: chamar `analyze-disc` (ja existe)
-  - CSVs de clima: chamar nova function `analyze-people-data`
-
-**Atualizacao: `src/lib/types.ts`**
-- Adicionar tipo `pesquisa_clima` ao enum `SourceType`
-- Adicionar configuracao no `SOURCE_TYPES`
-
----
-
-## 3. Edge Function `analyze-people-data`
-
-### Objetivo
-Processar arquivos de dados de pessoas (CSVs de clima, etc) e atualizar perfis de colaboradores SEM gerar evidencias/gaps na Matriz.
-
-### Nova Edge Function: `supabase/functions/analyze-people-data/index.ts`
-
-**Responsabilidades:**
-- Receber conteudo do arquivo e tipo (clima, etc)
-- Processar CSV de clima organizacional:
-  - Identificar colaboradores mencionados
-  - Extrair metricas de engajamento/satisfacao
-  - Atualizar metadados no perfil do colaborador
-- Retornar lista de colaboradores atualizados
-
-**Estrutura:**
-```typescript
-// Inputs
+```json
 {
-  projectId: string;
-  assetId: string;
-  content: string;
-  dataType: 'pesquisa_clima' | 'feedback_360';
-}
-
-// Output
-{
-  collaboratorsUpdated: number;
-  newCollaborators: number;
-  insights: string[];
+  "teamInsight": "string",
+  "initiatives": [
+    {
+      "id": "IE01",
+      "title": "Nome da Iniciativa",
+      "related_gaps": ["G01", "G03"],
+      "strategy": "Descricao tatica do que fazer",
+      "expected_impact": "Conversao / Previsibilidade",
+      "effort": "low|medium|high",
+      "target_pilar": "processos"
+    }
+  ]
 }
 ```
 
-**Prompt de IA para Pesquisa de Clima:**
-- Extrair nomes de colaboradores do CSV
-- Identificar metricas de satisfacao/engajamento
-- Cruzar com colaboradores existentes no projeto
-- Gerar insights sobre cultura do time
+### 2.3 Atualizacao do Insert no Banco
 
-**Atualizacao: `supabase/config.toml`**
-- Adicionar configuracao para nova function
+Mapear novos campos ao inserir:
+- `related_gaps` -> array de strings
+- `expected_impact` -> texto com metricas afetadas
+- `sequential_id` -> gerado sequencialmente (1, 2, 3...)
 
 ---
 
-## Diagrama de Fluxo
+## 3. Novos Componentes Frontend
+
+### 3.1 `InitiativeTable.tsx` (Novo)
+
+Tabela seguindo o padrao de `EvidenceTable.tsx`:
+
+**Colunas:**
+| Coluna | Descricao | Largura |
+|--------|-----------|---------|
+| Iniciativa | ID + Titulo (ex: "IE01 — Reestruturacao") | 30% |
+| Gaps Atacados | Badges cinzas (G01, G03) com Tooltip | 15% |
+| Direcionamento | Texto descritivo (strategy/description) | 35% |
+| Impacto Esperado | Texto com setas (↑ Conversao) | 15% |
+| Acoes | Dropdown menu | 5% |
+
+### 3.2 `InitiativeTableRow.tsx` (Novo)
+
+Linha individual da tabela com:
+- Formatacao do ID: `IE{sequential_id.toString().padStart(2, '0')}`
+- Badges para gaps com Tooltip mostrando descricao do gap
+- Dropdown com acoes: Aprovar, Iniciar, Concluir, Excluir
+
+### 3.3 `GapTooltip.tsx` (Novo - Opcional)
+
+Componente de Tooltip que:
+- Recebe ID do gap (ex: "G01")
+- Busca evidencia correspondente (via sequential_id)
+- Exibe: pilar + descricao do gap
+
+---
+
+## 4. Atualizacoes de Arquivos Existentes
+
+### 4.1 `Plan.tsx`
+
+**Alteracoes:**
+- Substituir `InitiativeCard` por `InitiativeTable`
+- Adicionar busca de evidencias para contexto dos tooltips
+- Passar evidencias para o componente de tabela
+
+### 4.2 `useInitiatives.ts`
+
+**Alteracoes:**
+- Atualizar interface `Initiative` com novos campos:
+  - `related_gaps: string[]`
+  - `expected_impact: string | null`
+  - `sequential_id: number | null`
+- Atualizar query para ordenar por `sequential_id`
+
+### 4.3 `src/lib/types.ts`
+
+**Adicoes:**
+- `InitiativeImpactDisplay` config para labels de impacto
+
+---
+
+## 5. Fluxo de Dados
 
 ```text
-+------------------+     +-------------------+     +------------------+
-|                  |     |                   |     |                  |
-|   VAULT          |     |   TEAM            |     |   MATRIZ         |
-|                  |     |                   |     |                  |
-+--------+---------+     +---------+---------+     +--------+---------+
-         |                         |                        ^
-         v                         v                        |
-+--------+---------+     +---------+---------+              |
-| Upload Arquivos  |     | Upload Pessoas    |              |
-| + Nota Tecnica   |     | (DISC, Clima)     |              |
-+--------+---------+     +---------+---------+              |
-         |                         |                        |
-         v                         v                        |
-+--------+---------+     +---------+---------+              |
-| analyze-         |     | analyze-disc      |              |
-| evidences        |     | analyze-people-   |              |
-|                  |     | data              |              |
-+--------+---------+     +---------+---------+              |
-         |                         |                        |
-         v                         v                        |
-+--------+---------+     +---------+---------+              |
-| GAPS na Matriz   |     | Perfis de         |              |
-| (evidences)      |     | Colaboradores     +--------------+
-+------------------+     +-------------------+  (Nao gera gaps)
+[Gerar Plano]
+     |
+     v
+[Edge Function: generate-strategic-plan]
+     |
+     +-- 1. Busca evidencias validadas com sequential_id
+     |
+     +-- 2. Formata como: "G01: Baixa aderencia ao CRM..."
+     |
+     +-- 3. Envia para IA com prompt atualizado
+     |
+     +-- 4. Recebe resposta com related_gaps
+     |
+     +-- 5. Salva no banco com sequential_id
+     |
+     v
+[Frontend: InitiativeTable]
+     |
+     +-- Exibe IE01, IE02...
+     |
+     +-- Badges G01, G03 com Tooltip
+     |
+     +-- Usuario ve rastreabilidade
 ```
 
 ---
@@ -153,36 +159,45 @@ Processar arquivos de dados de pessoas (CSVs de clima, etc) e atualizar perfis d
 
 | Arquivo | Descricao |
 |---------|-----------|
-| `src/components/vault/TechnicalNoteModal.tsx` | Modal para nota tecnica |
-| `src/components/team/PeopleDataUploadZone.tsx` | Zona de upload para Team |
-| `src/components/team/PeopleDataTypeModal.tsx` | Modal de classificacao |
-| `supabase/functions/analyze-people-data/index.ts` | Edge function nova |
+| `src/components/plan/InitiativeTable.tsx` | Tabela principal de iniciativas |
+| `src/components/plan/InitiativeTableRow.tsx` | Linha individual com tooltip |
 
 ### Arquivos a Modificar
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/pages/Vault.tsx` | Adicionar botao e modal de Nota Tecnica |
-| `src/pages/Team.tsx` | Adicionar zona de upload e processamento |
-| `src/lib/types.ts` | Adicionar `pesquisa_clima` ao SourceType |
-| `src/hooks/useAnalyzeEvidences.ts` | Adicionar handler para nota tecnica |
-| `supabase/functions/analyze-evidences/index.ts` | Detectar notas tecnicas com alta confianca |
-| `supabase/config.toml` | Registrar nova edge function |
+| `src/pages/Plan.tsx` | Trocar cards por tabela, buscar evidencias |
+| `src/hooks/useInitiatives.ts` | Novos campos na interface |
+| `supabase/functions/generate-strategic-plan/index.ts` | Novo prompt e schema |
 
-### Migracao de Banco (Se Necessario)
+### Migracao SQL
 
-Verificar se o enum `source_type` ja inclui `pesquisa_clima`. Se nao:
 ```sql
-ALTER TYPE source_type ADD VALUE 'pesquisa_clima';
+ALTER TABLE public.initiatives 
+ADD COLUMN IF NOT EXISTS related_gaps text[] DEFAULT '{}',
+ADD COLUMN IF NOT EXISTS expected_impact text,
+ADD COLUMN IF NOT EXISTS sequential_id integer;
+
+-- Trigger para sequential_id automatico
+CREATE OR REPLACE FUNCTION set_initiative_sequential_id()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.sequential_id := COALESCE(
+    (SELECT MAX(sequential_id) + 1 FROM initiatives WHERE project_id = NEW.project_id),
+    1
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tr_initiative_sequential_id
+BEFORE INSERT ON initiatives
+FOR EACH ROW
+WHEN (NEW.sequential_id IS NULL)
+EXECUTE FUNCTION set_initiative_sequential_id();
 ```
 
 ### Dependencias
+
 - Nenhuma nova dependencia necessaria
-- Reutiliza componentes existentes (Dialog, Button, FileUploadZone pattern)
-
-### Estimativa de Implementacao
-- **Nota Tecnica**: 2 arquivos novos, 3 modificacoes
-- **Upload Team**: 2 arquivos novos, 2 modificacoes
-- **Edge Function**: 1 arquivo novo, 1 modificacao (config)
-
-**Total**: 5 novos arquivos + 6 modificacoes
+- Reutiliza componentes Table, Badge, Tooltip do shadcn/ui
