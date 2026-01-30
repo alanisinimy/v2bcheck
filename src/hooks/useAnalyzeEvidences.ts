@@ -20,6 +20,26 @@ interface AnalyzeResult {
   error?: string;
 }
 
+// Deduplicate evidences by normalized content
+function deduplicateEvidences(evidences: ExtractedEvidence[]): ExtractedEvidence[] {
+  const seen = new Map<string, ExtractedEvidence>();
+  
+  for (const evidence of evidences) {
+    // Normalize: trim, lowercase, collapse whitespace
+    const normalizedContent = evidence.content
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
+    
+    // Keep only the first occurrence
+    if (!seen.has(normalizedContent)) {
+      seen.set(normalizedContent, evidence);
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
 export async function analyzeEvidences({
   projectId,
   assetId,
@@ -44,6 +64,15 @@ export async function analyzeEvidences({
     const evidences: ExtractedEvidence[] = data.evidences;
 
     if (!evidences || evidences.length === 0) {
+      return { count: 0 };
+    }
+
+    // Deduplicate evidences before inserting
+    const uniqueEvidences = deduplicateEvidences(evidences);
+    
+    console.log(`Deduplication: ${evidences.length} → ${uniqueEvidences.length} evidences`);
+
+    if (uniqueEvidences.length === 0) {
       return { count: 0 };
     }
 
