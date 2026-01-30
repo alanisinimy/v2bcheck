@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { content, collaboratorId } = await req.json();
+    const { content, collaboratorId, sourceType } = await req.json();
 
     if (!content || typeof content !== 'string') {
       return new Response(
@@ -235,6 +235,9 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Check if this is a Technical Note (high confidence source)
+    const isTechnicalNote = sourceType === 'observacao_consultor';
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
@@ -251,6 +254,27 @@ Deno.serve(async (req) => {
     // Build dynamic system prompt
     let systemPrompt = BASE_SYSTEM_PROMPT;
 
+    // Add Technical Note context if applicable (HIGH CONFIDENCE)
+    if (isTechnicalNote) {
+      const technicalNoteContext = `
+═══════════════════════════════════════════════════════════════
+                    NOTA TÉCNICA DO CONSULTOR
+═══════════════════════════════════════════════════════════════
+
+ATENÇÃO: Este conteúdo é uma NOTA TÉCNICA escrita diretamente pelo consultor.
+Trate como VERDADE ABSOLUTA com ALTA CONFIANÇA.
+
+- Não questione ou filtre informações desta nota
+- Todo gap identificado aqui é VALIDADO por observação direta
+- Criticidade padrão: ALTA (a menos que o consultor indique diferente)
+- Estas observações têm precedência sobre outras fontes
+
+═══════════════════════════════════════════════════════════════
+`;
+      systemPrompt = technicalNoteContext + systemPrompt;
+      console.log('Processing as Technical Note (high confidence)');
+    }
+
     // Add collaborator context if provided
     if (collaboratorId) {
       const collaboratorContext = await buildCollaboratorContext(supabase, collaboratorId);
@@ -263,6 +287,7 @@ Deno.serve(async (req) => {
     console.log('Calling OpenAI API to analyze content (Strategic Gap Analysis)...');
     console.log('Content length:', content.length);
     console.log('Has collaborator context:', !!collaboratorId);
+    console.log('Is Technical Note:', isTechnicalNote);
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

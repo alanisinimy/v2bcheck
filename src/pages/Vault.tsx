@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckSquare, X, Trash2, Loader2 } from 'lucide-react';
+import { CheckSquare, X, Trash2, Loader2, FileText } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { FileUploadZone } from '@/components/vault/FileUploadZone';
 import { AssetCard } from '@/components/vault/AssetCard';
 import { SourceTypeModal } from '@/components/vault/SourceTypeModal';
+import { TechnicalNoteModal } from '@/components/vault/TechnicalNoteModal';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -21,7 +22,7 @@ import {
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useAssets, useDeleteAsset } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
-import { analyzeEvidences, extractTextFromFile } from '@/hooks/useAnalyzeEvidences';
+import { analyzeEvidences, extractTextFromFile, analyzeTechnicalNote } from '@/hooks/useAnalyzeEvidences';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SourceType } from '@/lib/types';
@@ -54,6 +55,10 @@ export default function Vault() {
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [classifiedFiles, setClassifiedFiles] = useState<PendingFile[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Technical Note modal state
+  const [isTechnicalNoteOpen, setIsTechnicalNoteOpen] = useState(false);
+  const [isProcessingNote, setIsProcessingNote] = useState(false);
 
   const processFiles = useCallback(async (files: PendingFile[]) => {
     if (!currentProject) return;
@@ -199,6 +204,49 @@ export default function Vault() {
     setClassifiedFiles([]);
   }, []);
 
+  // Technical Note handler
+  const handleTechnicalNoteSubmit = useCallback(async (title: string, content: string) => {
+    if (!currentProject) return;
+    
+    setIsProcessingNote(true);
+    
+    try {
+      const result = await analyzeTechnicalNote({
+        projectId: currentProject.id,
+        title,
+        content,
+      });
+
+      if (result.error) {
+        toast({
+          title: 'Erro na análise',
+          description: result.error,
+          variant: 'destructive',
+        });
+      } else {
+        // Refresh assets and evidences
+        queryClient.invalidateQueries({ queryKey: ['assets', currentProject.id] });
+        queryClient.invalidateQueries({ queryKey: ['evidences', currentProject.id] });
+        
+        toast({
+          title: 'Nota técnica processada',
+          description: `${result.count} gaps estratégicos extraídos.`,
+        });
+        
+        setIsTechnicalNoteOpen(false);
+      }
+    } catch (error) {
+      console.error('Technical note error:', error);
+      toast({
+        title: 'Erro ao processar nota',
+        description: 'Não foi possível processar a nota técnica.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessingNote(false);
+    }
+  }, [currentProject, queryClient]);
+
   const handleDeleteAsset = useCallback(async (assetId: string, storagePath: string) => {
     if (!currentProject) return;
     
@@ -336,6 +384,18 @@ export default function Vault() {
           </p>
         </motion.header>
 
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3 mb-6">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsTechnicalNoteOpen(true)}
+            className="gap-2"
+          >
+            <FileText className="w-4 h-4" />
+            Adicionar Nota Técnica
+          </Button>
+        </div>
+
         {/* Upload Zone */}
         <FileUploadZone 
           onFilesSelected={handleFilesSelected}
@@ -349,6 +409,14 @@ export default function Vault() {
           projectId={currentProject.id}
           onConfirm={handleSourceTypeConfirm}
           onCancel={handleSourceTypeCancel}
+        />
+
+        {/* Technical Note Modal */}
+        <TechnicalNoteModal
+          open={isTechnicalNoteOpen}
+          onOpenChange={setIsTechnicalNoteOpen}
+          onSubmit={handleTechnicalNoteSubmit}
+          isProcessing={isProcessingNote}
         />
 
         {/* Processing Message */}

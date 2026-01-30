@@ -16,7 +16,8 @@ export type SourceType =
   | 'briefing'
   | 'documentacao'
   | 'observacao_consultor'
-  | 'perfil_disc';
+  | 'perfil_disc'
+  | 'pesquisa_clima';
 
 export type EvidenceType = 'fato' | 'divergencia' | 'ponto_forte';
 
@@ -35,6 +36,7 @@ export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> =
   documentacao: { label: 'Documentação Técnica', icon: '📄' },
   observacao_consultor: { label: 'Observação do Consultor', icon: '👁️' },
   perfil_disc: { label: 'Perfil DISC', icon: '📊' },
+  pesquisa_clima: { label: 'Pesquisa de Clima', icon: '🌡️' },
 };
 
 export const EVIDENCE_TYPES: Record<EvidenceType, { label: string; icon: string; color: string }> = {

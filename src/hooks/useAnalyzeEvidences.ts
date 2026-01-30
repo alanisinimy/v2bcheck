@@ -149,6 +149,137 @@ async function analyzeDiscProfile({
   }
 }
 
+// Function to analyze Technical Notes (high confidence source)
+interface TechnicalNoteParams {
+  projectId: string;
+  title: string;
+  content: string;
+}
+
+interface TechnicalNoteResult {
+  count: number;
+  error?: string;
+  assetId?: string;
+}
+
+export async function analyzeTechnicalNote({
+  projectId,
+  title,
+  content,
+}: TechnicalNoteParams): Promise<TechnicalNoteResult> {
+  try {
+    // Create a virtual asset for the technical note
+    const { data: asset, error: assetError } = await supabase
+      .from('assets')
+      .insert({
+        project_id: projectId,
+        file_name: `Nota Técnica: ${title}`,
+        file_type: 'text/plain',
+        file_size: content.length,
+        storage_path: `technical-notes/${Date.now()}`,
+        source_type: 'observacao_consultor' as const,
+        status: 'processing' as const,
+      })
+      .select()
+      .single();
+
+    if (assetError) {
+      console.error('Error creating asset for technical note:', assetError);
+      throw new Error('Failed to create asset for technical note');
+    }
+
+    // Format source description
+    const formattedSource = `👁️ Observação do Consultor • ${title}`;
+
+    // Call the Edge Function with technical note flag
+    const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
+      body: { 
+        content, 
+        sourceType: 'observacao_consultor' 
+      }
+    });
+
+    if (functionError) {
+      console.error('Edge function error:', functionError);
+      
+      // Update asset status to error
+      await supabase
+        .from('assets')
+        .update({ status: 'error' })
+        .eq('id', asset.id);
+        
+      throw new Error(functionError.message || 'Failed to analyze technical note');
+    }
+
+    if (data.error) {
+      await supabase
+        .from('assets')
+        .update({ status: 'error' })
+        .eq('id', asset.id);
+        
+      throw new Error(data.error);
+    }
+
+    // Process the gaps and insert them
+    const gaps = data.gaps;
+
+    if (!gaps || gaps.length === 0) {
+      // Update asset status to completed even if no gaps
+      await supabase
+        .from('assets')
+        .update({ status: 'completed' })
+        .eq('id', asset.id);
+        
+      return { count: 0, assetId: asset.id };
+    }
+
+    console.log(`Received ${gaps.length} strategic gaps from Technical Note`);
+
+    // Map gaps to evidences table structure
+    const evidencesToInsert = gaps.map((gap: any) => ({
+      project_id: projectId,
+      asset_id: asset.id,
+      pilar: gap.pilar,
+      content: gap.gap,
+      benchmark: gap.benchmark,
+      impact: gap.impacto,
+      criticality: gap.criticidade,
+      source_description: formattedSource,
+      status: 'pendente' as const,
+      is_divergence: gap.is_divergence || false,
+      divergence_description: gap.divergence_description || null,
+      evidence_type: gap.is_divergence ? 'divergencia' as const : 'fato' as const,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('evidences')
+      .insert(evidencesToInsert);
+
+    if (insertError) {
+      console.error('Failed to insert gaps from technical note:', insertError);
+      await supabase
+        .from('assets')
+        .update({ status: 'error' })
+        .eq('id', asset.id);
+      throw new Error('Failed to save gaps to database');
+    }
+
+    // Update asset status to completed
+    await supabase
+      .from('assets')
+      .update({ status: 'completed' })
+      .eq('id', asset.id);
+
+    return { count: gaps.length, assetId: asset.id };
+  } catch (error) {
+    console.error('analyzeTechnicalNote error:', error);
+    return {
+      count: 0,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
 // Helper function to extract text from files
 export async function extractTextFromFile(file: File): Promise<string | null> {
   const fileName = file.name.toLowerCase();
