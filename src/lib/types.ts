@@ -11,6 +11,8 @@ export type SourceType =
   | 'entrevista_operacao'
   | 'reuniao_kickoff'
   | 'reuniao_vendas'
+  | 'reuniao_diagnostico'
+  | 'reuniao_planejamento'
   | 'briefing'
   | 'documentacao'
   | 'observacao_consultor'
@@ -27,10 +29,12 @@ export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> =
   entrevista_operacao: { label: 'Entrevista (Time/Operação)', icon: '👥' },
   reuniao_kickoff: { label: 'Reunião de Kick-off', icon: '🚀' },
   reuniao_vendas: { label: 'Reunião de Vendas (Gravada)', icon: '📞' },
+  reuniao_diagnostico: { label: 'Reunião de Diagnóstico', icon: '🔍' },
+  reuniao_planejamento: { label: 'Reunião de Planejamento', icon: '📋' },
   briefing: { label: 'Briefing / Formulário', icon: '📝' },
   documentacao: { label: 'Documentação Técnica', icon: '📄' },
   observacao_consultor: { label: 'Observação do Consultor', icon: '👁️' },
-  perfil_disc: { label: 'Perfil DISC', icon: '📋' },
+  perfil_disc: { label: 'Perfil DISC', icon: '📊' },
 };
 
 export const EVIDENCE_TYPES: Record<EvidenceType, { label: string; icon: string; color: string }> = {
