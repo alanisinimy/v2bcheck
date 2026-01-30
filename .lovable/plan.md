@@ -1,92 +1,79 @@
 
 
-# Correção da Edge Function para usar OpenAI diretamente
+# Melhorias no Vault e Matriz de Evidências
 
-A Edge Function está usando o Lovable AI Gateway com modelo Gemini, mas o projeto tem a chave `OPENAI_API_KEY` configurada.
-
----
-
-## Problema Atual
-
-```text
-Código atual:
-├── Usa: LOVABLE_API_KEY + Lovable Gateway
-├── Modelo: google/gemini-3-flash-preview
-└── Resultado: Erro (chave não configurada para Gemini)
-
-Você tem:
-├── OPENAI_API_KEY ✓ (configurada)
-└── LOVABLE_API_KEY (não usada)
-```
+Duas funcionalidades serão implementadas:
 
 ---
 
-## Solução
+## 1. Exclusão de Arquivos no Vault
 
-Reescrever `supabase/functions/analyze-evidences/index.ts` para:
+Adicionar botão de lixeira no `AssetCard` para deletar arquivos enviados.
 
-1. Importar a biblioteca oficial OpenAI para Deno
-2. Usar `OPENAI_API_KEY` do ambiente
-3. Chamar modelo `gpt-4o`
-4. Manter o mesmo System Prompt do Auditor de Vendas
+**Fluxo:**
+- Usuário clica no ícone de lixeira
+- Modal de confirmação aparece
+- Ao confirmar: deleta arquivo do Storage e remove registro do banco
 
----
-
-## Mudanças Técnicas
-
-| De (atual) | Para (novo) |
-|------------|-------------|
-| Lovable AI Gateway | OpenAI API direta |
-| `LOVABLE_API_KEY` | `OPENAI_API_KEY` |
-| `google/gemini-3-flash-preview` | `gpt-4o` |
-| `fetch()` manual | SDK `OpenAI` oficial |
-
----
-
-## Nova Implementação
-
-**Import:**
-```typescript
-import OpenAI from 'https://deno.land/x/openai@v4.28.0/mod.ts';
-```
-
-**Cliente:**
-```typescript
-const openai = new OpenAI({ 
-  apiKey: Deno.env.get('OPENAI_API_KEY') 
-});
-```
-
-**Chamada:**
-```typescript
-const completion = await openai.chat.completions.create({
-  model: 'gpt-4o',
-  messages: [...],
-  tools: [...],
-  tool_choice: { type: 'function', function: { name: 'extract_evidences' } }
-});
-```
-
----
-
-## System Prompt (Mantido)
-
-O prompt do Auditor de Vendas B2B permanece idêntico, classificando evidências nos 5 pilares.
-
----
-
-## Arquivo a Modificar
+**Arquivos a modificar:**
 
 | Arquivo | Ação |
 |---------|------|
-| `supabase/functions/analyze-evidences/index.ts` | Reescrever |
+| `src/components/vault/AssetCard.tsx` | Adicionar botão delete + modal de confirmação |
+| `src/hooks/useProject.ts` | Criar hook `useDeleteAsset` |
+| `src/pages/Vault.tsx` | Passar callback de delete para AssetCard |
+
+**Novo hook `useDeleteAsset`:**
+```text
+1. Remove arquivo do storage: supabase.storage.from('project-files').remove([path])
+2. Deleta evidências associadas: DELETE FROM evidences WHERE asset_id = ?
+3. Deleta registro do asset: DELETE FROM assets WHERE id = ?
+4. Invalida queries
+```
+
+---
+
+## 2. Toggle de Status nas Evidências
+
+Alterar comportamento dos botões Validar/Rejeitar/Investigar para funcionar como toggle.
+
+**Comportamento atual:**
+- Clicar "Validar" sempre define status = `validado`
+
+**Novo comportamento:**
+- Clicar "Validar" quando já está `validado` → volta para `pendente`
+- Clicar "Rejeitar" quando já está `rejeitado` → volta para `pendente`
+- Clicar "Investigar" quando já está `investigar` → volta para `pendente`
+
+**Arquivo a modificar:**
+
+| Arquivo | Ação |
+|---------|------|
+| `src/components/matriz/EvidenceCard.tsx` | Adicionar lógica de toggle nos onClick |
+
+**Lógica no onClick:**
+```text
+onClick={() => onStatusChange(
+  evidence.id, 
+  evidence.status === 'validado' ? 'pendente' : 'validado'
+)}
+```
+
+---
+
+## Resumo das Mudanças
+
+| Componente | Mudança |
+|------------|---------|
+| `AssetCard` | + botão lixeira, + dialog confirmação, + props onDelete |
+| `Vault.tsx` | + handler delete, + feedback toast |
+| `useProject.ts` | + hook `useDeleteAsset` |
+| `EvidenceCard` | Lógica toggle nos 3 botões de status |
 
 ---
 
 ## Resultado Esperado
 
-1. Edge Function usa `OPENAI_API_KEY` que você já configurou
-2. Modelo GPT-4o processa os textos
-3. Extração de evidências funciona corretamente
-4. Upload no Vault dispara a análise com sucesso
+1. No Vault: botão de lixeira em cada arquivo → confirma → deleta arquivo e evidências associadas
+2. Na Matriz: clicar em "Validar" de novo desmarca e volta para "Pendente"
 
