@@ -77,6 +77,8 @@ export type Database = {
           profile_source: Database["public"]["Enums"]["profile_source_type"]
           project_id: string
           role: string | null
+          role_fit_level: string | null
+          role_fit_reason: string | null
           updated_at: string
         }
         Insert: {
@@ -88,6 +90,8 @@ export type Database = {
           profile_source?: Database["public"]["Enums"]["profile_source_type"]
           project_id: string
           role?: string | null
+          role_fit_level?: string | null
+          role_fit_reason?: string | null
           updated_at?: string
         }
         Update: {
@@ -99,6 +103,8 @@ export type Database = {
           profile_source?: Database["public"]["Enums"]["profile_source_type"]
           project_id?: string
           role?: string | null
+          role_fit_level?: string | null
+          role_fit_reason?: string | null
           updated_at?: string
         }
         Relationships: [
