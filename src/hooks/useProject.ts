@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Project, Asset, Evidence, EvidenceStatus, Pilar } from '@/lib/types';
+import type { Project, Asset, Evidence, EvidenceStatus, Pilar, ImpactType, CriticalityType } from '@/lib/types';
 
 // Fetch all projects
 export function useProjects() {
@@ -69,7 +69,7 @@ export function useEvidences(projectId: string | undefined) {
         .from('evidences')
         .select('*')
         .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
+        .order('sequential_id', { ascending: true });
       
       if (error) throw error;
       return data as Evidence[];
@@ -96,6 +96,61 @@ export function useUpdateEvidenceStatus() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['evidences', data.project_id] });
+    },
+  });
+}
+
+// Update evidence (all fields)
+export function useUpdateEvidence() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      evidenceId, 
+      updates 
+    }: { 
+      evidenceId: string; 
+      updates: {
+        content?: string;
+        benchmark?: string;
+        pilar?: Pilar;
+        impact?: ImpactType;
+        criticality?: CriticalityType;
+        status?: EvidenceStatus;
+      }
+    }) => {
+      const { data, error } = await supabase
+        .from('evidences')
+        .update(updates)
+        .eq('id', evidenceId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as Evidence;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['evidences', data.project_id] });
+    },
+  });
+}
+
+// Delete evidence
+export function useDeleteEvidence() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ evidenceId, projectId }: { evidenceId: string; projectId: string }) => {
+      const { error } = await supabase
+        .from('evidences')
+        .delete()
+        .eq('id', evidenceId);
+      
+      if (error) throw error;
+      return { evidenceId, projectId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['evidences', data.projectId] });
     },
   });
 }
