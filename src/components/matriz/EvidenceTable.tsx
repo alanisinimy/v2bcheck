@@ -33,6 +33,7 @@ const ITEMS_PER_PAGE = 20;
 export function EvidenceTable({ evidences, projectId, onStatusChange }: EvidenceTableProps) {
   const [selectedPilar, setSelectedPilar] = useState<Pilar | 'all'>('all');
   const [selectedCriticality, setSelectedCriticality] = useState<CriticalityType | 'all'>('all');
+  const [selectedStatus, setSelectedStatus] = useState<EvidenceStatus | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null);
@@ -45,6 +46,7 @@ export function EvidenceTable({ evidences, projectId, onStatusChange }: Evidence
     return evidences.filter((ev) => {
       if (selectedPilar !== 'all' && ev.pilar !== selectedPilar) return false;
       if (selectedCriticality !== 'all' && (ev.criticality || 'media') !== selectedCriticality) return false;
+      if (selectedStatus !== 'all' && ev.status !== selectedStatus) return false;
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchesContent = ev.content.toLowerCase().includes(search);
@@ -53,7 +55,7 @@ export function EvidenceTable({ evidences, projectId, onStatusChange }: Evidence
       }
       return true;
     });
-  }, [evidences, selectedPilar, selectedCriticality, searchTerm]);
+  }, [evidences, selectedPilar, selectedCriticality, selectedStatus, searchTerm]);
 
   // Pagination
   const totalPages = Math.ceil(filteredEvidences.length / ITEMS_PER_PAGE);
@@ -151,9 +153,11 @@ export function EvidenceTable({ evidences, projectId, onStatusChange }: Evidence
       <TableFilters
         selectedPilar={selectedPilar}
         selectedCriticality={selectedCriticality}
+        selectedStatus={selectedStatus}
         searchTerm={searchTerm}
         onPilarChange={handleFilterChange(setSelectedPilar)}
         onCriticalityChange={handleFilterChange(setSelectedCriticality)}
+        onStatusChange={handleFilterChange(setSelectedStatus)}
         onSearchChange={handleFilterChange(setSearchTerm)}
         totalCount={evidences.length}
         filteredCount={filteredEvidences.length}
@@ -169,13 +173,14 @@ export function EvidenceTable({ evidences, projectId, onStatusChange }: Evidence
               <TableHead className="w-[200px]">Benchmark</TableHead>
               <TableHead className="w-[100px]">Impacto</TableHead>
               <TableHead className="w-[100px]">Criticidade</TableHead>
+              <TableHead className="w-[100px]">Status</TableHead>
               <TableHead className="w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedEvidences.length === 0 ? (
               <TableRow>
-                <td colSpan={7} className="h-24 text-center text-muted-foreground">
+                <td colSpan={8} className="h-24 text-center text-muted-foreground">
                   {evidences.length === 0
                     ? 'Nenhuma evidência ainda. Clique em "Nova Evidência" para criar uma.'
                     : 'Nenhuma evidência encontrada com os filtros atuais.'}

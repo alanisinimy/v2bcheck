@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { PILARES, IMPACT_CONFIG, CRITICALITY_CONFIG } from '@/lib/types';
+import { PILARES, IMPACT_CONFIG, CRITICALITY_CONFIG, STATUS_CONFIG } from '@/lib/types';
 import type { Evidence, EvidenceStatus } from '@/lib/types';
 
 interface EvidenceTableRowProps {
@@ -101,6 +101,16 @@ export function EvidenceTableRow({
             className={cn('text-xs', criticalityConfig.color)}
           >
             {criticalityConfig.label}
+          </Badge>
+        </TableCell>
+
+        {/* Status */}
+        <TableCell className="w-[100px]">
+          <Badge 
+            variant="outline" 
+            className={cn('text-xs', STATUS_CONFIG[evidence.status].color)}
+          >
+            {STATUS_CONFIG[evidence.status].label}
           </Badge>
         </TableCell>
 

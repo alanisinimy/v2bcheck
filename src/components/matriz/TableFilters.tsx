@@ -7,15 +7,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PILARES, CRITICALITY_CONFIG } from '@/lib/types';
-import type { Pilar, CriticalityType } from '@/lib/types';
+import { PILARES, CRITICALITY_CONFIG, STATUS_CONFIG } from '@/lib/types';
+import type { Pilar, CriticalityType, EvidenceStatus } from '@/lib/types';
 
 interface TableFiltersProps {
   selectedPilar: Pilar | 'all';
   selectedCriticality: CriticalityType | 'all';
+  selectedStatus: EvidenceStatus | 'all';
   searchTerm: string;
   onPilarChange: (pilar: Pilar | 'all') => void;
   onCriticalityChange: (criticality: CriticalityType | 'all') => void;
+  onStatusChange: (status: EvidenceStatus | 'all') => void;
   onSearchChange: (search: string) => void;
   totalCount: number;
   filteredCount: number;
@@ -23,13 +25,16 @@ interface TableFiltersProps {
 
 const pilares: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
 const criticalities: CriticalityType[] = ['alta', 'media', 'baixa'];
+const statuses: EvidenceStatus[] = ['pendente', 'validado', 'rejeitado', 'investigar'];
 
 export function TableFilters({
   selectedPilar,
   selectedCriticality,
+  selectedStatus,
   searchTerm,
   onPilarChange,
   onCriticalityChange,
+  onStatusChange,
   onSearchChange,
   totalCount,
   filteredCount,
@@ -59,6 +64,20 @@ export function TableFilters({
           {criticalities.map((c) => (
             <SelectItem key={c} value={c}>
               {CRITICALITY_CONFIG[c].label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={selectedStatus} onValueChange={(v) => onStatusChange(v as EvidenceStatus | 'all')}>
+        <SelectTrigger className="w-[160px] h-9 text-sm">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos os Status</SelectItem>
+          {statuses.map((s) => (
+            <SelectItem key={s} value={s}>
+              {STATUS_CONFIG[s].label}
             </SelectItem>
           ))}
         </SelectContent>
