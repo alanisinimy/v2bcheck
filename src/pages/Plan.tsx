@@ -4,9 +4,9 @@ import { Sparkles, Loader2, FileText, Users, BarChart3 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { Button } from '@/components/ui/button';
-import { InitiativeCard } from '@/components/plan/InitiativeCard';
+import { InitiativeTable } from '@/components/plan/InitiativeTable';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useProjectStats } from '@/hooks/useProject';
+import { useProjectStats, useEvidences } from '@/hooks/useProject';
 import { useCollaborators, useTeamDistribution } from '@/hooks/useCollaborators';
 import {
   useInitiatives,
@@ -22,6 +22,7 @@ export default function Plan() {
   const stats = useProjectStats(currentProject?.id);
   const { data: collaborators = [] } = useCollaborators(currentProject?.id);
   const { data: initiatives = [], isLoading: isLoadingInitiatives } = useInitiatives(currentProject?.id);
+  const { data: evidences = [] } = useEvidences(currentProject?.id);
   
   const generateMutation = useGeneratePlan();
   const updateMutation = useUpdateInitiative();
@@ -33,6 +34,9 @@ export default function Plan() {
 
   const distribution = useTeamDistribution(collaborators);
   const validatedCount = stats.byStatus?.validado || 0;
+
+  // Filter only validated evidences for context
+  const validatedEvidences = evidences.filter(e => e.status === 'validado');
 
   const handleGeneratePlan = async () => {
     if (!currentProject) return;
@@ -134,7 +138,7 @@ export default function Plan() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="p-8 max-w-6xl mx-auto">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
@@ -146,7 +150,7 @@ export default function Plan() {
               Plano Estratégico
             </h1>
             <p className="text-muted-foreground">
-              Iniciativas geradas pela IA cruzando problemas e perfil do time
+              Iniciativas geradas pela IA cruzando gaps identificados e perfil do time
             </p>
           </div>
           <Button
@@ -186,7 +190,7 @@ export default function Plan() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{validatedCount}</p>
-                <p className="text-xs text-muted-foreground">Evidências Validadas</p>
+                <p className="text-xs text-muted-foreground">Gaps Validados</p>
               </div>
             </div>
             
@@ -220,7 +224,7 @@ export default function Plan() {
           )}
         </motion.div>
 
-        {/* Initiatives List */}
+        {/* Initiatives Table */}
         {initiatives.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -234,11 +238,11 @@ export default function Plan() {
             </h3>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
               Clique em "Gerar Plano com IA" para criar iniciativas estratégicas 
-              baseadas nas evidências validadas e no perfil do seu time.
+              baseadas nos gaps validados e no perfil do seu time.
             </p>
             {validatedCount === 0 && (
               <p className="text-sm text-warning">
-                ⚠️ Você precisa validar evidências na Matriz antes de gerar o plano.
+                ⚠️ Você precisa validar gaps na Matriz antes de gerar o plano.
               </p>
             )}
           </motion.div>
@@ -250,20 +254,17 @@ export default function Plan() {
             className="space-y-4"
           >
             <h2 className="text-lg font-semibold text-foreground">
-              Iniciativas Sugeridas ({initiatives.length})
+              Iniciativas Estratégicas ({initiatives.length})
             </h2>
             
-            {initiatives.map((initiative, index) => (
-              <InitiativeCard
-                key={initiative.id}
-                initiative={initiative}
-                index={index}
-                onUpdateStatus={(status) => handleUpdateStatus(initiative.id, status)}
-                onDelete={() => handleDelete(initiative.id)}
-                isUpdating={updatingId === initiative.id}
-                isDeleting={deletingId === initiative.id}
-              />
-            ))}
+            <InitiativeTable
+              initiatives={initiatives}
+              evidences={validatedEvidences}
+              onUpdateStatus={handleUpdateStatus}
+              onDelete={handleDelete}
+              updatingId={updatingId}
+              deletingId={deletingId}
+            />
           </motion.div>
         )}
       </div>

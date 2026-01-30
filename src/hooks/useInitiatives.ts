@@ -16,6 +16,9 @@ export interface Initiative {
   effort: InitiativeEffort;
   status: InitiativeStatus;
   target_pilar: Pilar | null;
+  related_gaps: string[];
+  expected_impact: string | null;
+  sequential_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,7 +33,7 @@ export function useInitiatives(projectId: string | undefined) {
         .from('initiatives')
         .select('*')
         .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
+        .order('sequential_id', { ascending: true, nullsFirst: false });
 
       if (error) throw error;
       return data as Initiative[];
