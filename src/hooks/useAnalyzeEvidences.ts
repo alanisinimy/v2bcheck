@@ -76,8 +76,8 @@ export async function analyzeEvidences({
       return { count: 0 };
     }
 
-    // Batch insert evidences into the database
-    const evidencesToInsert = evidences.map((ev) => ({
+    // Batch insert unique evidences into the database
+    const evidencesToInsert = uniqueEvidences.map((ev) => ({
       project_id: projectId,
       asset_id: assetId,
       pilar: ev.pilar,
@@ -97,7 +97,7 @@ export async function analyzeEvidences({
       throw new Error('Failed to save evidences to database');
     }
 
-    return { count: evidences.length };
+    return { count: uniqueEvidences.length };
   } catch (error) {
     console.error('analyzeEvidences error:', error);
     return { 
