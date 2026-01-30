@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.extract-project-context]
 verify_jwt = false
+
+[functions.consolidate-evidences]
+verify_jwt = false

@@ -64,7 +64,7 @@ export default function Vault() {
         const textContent = await extractTextFromFile(file);
 
         if (textContent) {
-          // Step 3: Analyze with AI
+          // Step 3: Analyze with AI (pass collaborator context if available)
           setProcessingMessage(`Analisando ${file.name} com IA...`);
           
           const result = await analyzeEvidences({
@@ -73,6 +73,7 @@ export default function Vault() {
             content: textContent,
             sourceDescription: file.name,
             sourceType,
+            collaboratorId: collaboratorId || undefined,
           });
 
           if (result.error) {
