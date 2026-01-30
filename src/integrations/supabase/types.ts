@@ -283,6 +283,7 @@ export type Database = {
           client_context: string | null
           client_name: string
           created_at: string
+          created_by: string | null
           description: string | null
           id: string
           main_pain_points: string | null
@@ -295,6 +296,7 @@ export type Database = {
           client_context?: string | null
           client_name: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
           main_pain_points?: string | null
@@ -307,6 +309,7 @@ export type Database = {
           client_context?: string | null
           client_name?: string
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
           main_pain_points?: string | null
