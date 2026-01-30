@@ -1,18 +1,22 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, Sparkles, Loader2 } from 'lucide-react';
+import { Trash2, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DiscProfileBars } from './DiscProfileBars';
-import { cn } from '@/lib/utils';
+import { RoleFitBadge } from './RoleFitBadge';
+import { RoleSelector } from './RoleSelector';
 import type { Collaborator } from '@/hooks/useCollaborators';
 
 interface CollaboratorCardProps {
   collaborator: Collaborator;
   onInferProfile: () => void;
   onDelete: () => void;
+  onUpdateRole: (role: string) => void;
+  onAnalyzeRoleFit: () => void;
   isInferring?: boolean;
   isDeleting?: boolean;
+  isAnalyzingFit?: boolean;
 }
 
 const STYLE_NAMES: Record<string, { name: string; emoji: string }> = {
@@ -32,14 +36,21 @@ export function CollaboratorCard({
   collaborator,
   onInferProfile,
   onDelete,
+  onUpdateRole,
+  onAnalyzeRoleFit,
   isInferring = false,
   isDeleting = false,
+  isAnalyzingFit = false,
 }: CollaboratorCardProps) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   
   const hasProfile = !!collaborator.disc_profile;
   const style = collaborator.primary_style ? STYLE_NAMES[collaborator.primary_style] : null;
   const source = SOURCE_LABELS[collaborator.profile_source];
+
+  const handleRoleChange = (newRole: string) => {
+    onUpdateRole(newRole);
+  };
 
   return (
     <motion.div
@@ -48,13 +59,18 @@ export function CollaboratorCard({
       className="glass rounded-xl p-4 border border-border/50"
     >
       <div className="flex items-start justify-between mb-3">
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-foreground">{collaborator.name}</h3>
-          {collaborator.role && (
-            <p className="text-sm text-muted-foreground">{collaborator.role}</p>
-          )}
+          <div className="mt-1">
+            <RoleSelector
+              value={collaborator.role}
+              onChange={handleRoleChange}
+              disabled={isAnalyzingFit}
+              className="h-8 w-full max-w-[180px]"
+            />
+          </div>
         </div>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-xs shrink-0 ml-2">
           {source.icon} {source.label}
         </Badge>
       </div>
@@ -70,6 +86,48 @@ export function CollaboratorCard({
               </span>
             </div>
           )}
+
+          {/* Role Fit Section */}
+          <div className="mt-4 pt-3 border-t border-border/30">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <RoleFitBadge level={collaborator.role_fit_level} />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={onAnalyzeRoleFit}
+                disabled={isAnalyzingFit || !collaborator.role}
+                className="h-7 text-xs"
+                title={!collaborator.role ? 'Selecione um cargo primeiro' : 'Recalcular análise de fit'}
+              >
+                {isAnalyzingFit ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    Analisando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Recalcular
+                  </>
+                )}
+              </Button>
+            </div>
+            {collaborator.role_fit_reason && (
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {collaborator.role_fit_reason}
+              </p>
+            )}
+            {!collaborator.role_fit_level && collaborator.role && (
+              <p className="text-xs text-muted-foreground italic">
+                Clique em "Recalcular" para analisar a adequação ao cargo.
+              </p>
+            )}
+            {!collaborator.role && (
+              <p className="text-xs text-muted-foreground italic">
+                Selecione um cargo para analisar o fit comportamental.
+              </p>
+            )}
+          </div>
         </>
       ) : (
         <div className="py-4 text-center">

@@ -14,6 +14,8 @@ import {
   useDeleteCollaborator,
   useInferProfile,
   useTeamDistribution,
+  useUpdateCollaborator,
+  useAnalyzeRoleFit,
 } from '@/hooks/useCollaborators';
 import { toast } from '@/hooks/use-toast';
 
@@ -22,11 +24,14 @@ export default function Team() {
   const { data: collaborators = [], isLoading: isLoadingCollaborators } = useCollaborators(currentProject?.id);
   const createMutation = useCreateCollaborator();
   const deleteMutation = useDeleteCollaborator();
+  const updateMutation = useUpdateCollaborator();
   const inferMutation = useInferProfile();
+  const analyzeFitMutation = useAnalyzeRoleFit();
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [inferringId, setInferringId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [analyzingFitId, setAnalyzingFitId] = useState<string | null>(null);
 
   const distribution = useTeamDistribution(collaborators);
 
@@ -107,6 +112,61 @@ export default function Team() {
     }
   };
 
+  const handleUpdateRole = async (collaborator: { id: string; name: string }, role: string) => {
+    if (!currentProject) return;
+    
+    try {
+      await updateMutation.mutateAsync({
+        id: collaborator.id,
+        projectId: currentProject.id,
+        role,
+        // Clear fit when role changes
+        role_fit_level: undefined,
+        role_fit_reason: undefined,
+      } as any);
+      
+      toast({
+        title: 'Cargo atualizado',
+        description: `${collaborator.name} agora é ${role}.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao atualizar cargo',
+        description: error.message || 'Não foi possível atualizar o cargo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleAnalyzeRoleFit = async (collaborator: { id: string; name: string; role: string | null; disc_profile: any }) => {
+    if (!currentProject || !collaborator.role || !collaborator.disc_profile) return;
+    
+    setAnalyzingFitId(collaborator.id);
+    
+    try {
+      await analyzeFitMutation.mutateAsync({
+        projectId: currentProject.id,
+        collaboratorId: collaborator.id,
+        collaboratorName: collaborator.name,
+        role: collaborator.role,
+        discProfile: collaborator.disc_profile,
+      });
+      
+      toast({
+        title: 'Análise concluída',
+        description: `O fit de ${collaborator.name} para ${collaborator.role} foi analisado.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro na análise',
+        description: error.message || 'Não foi possível analisar o fit.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAnalyzingFitId(null);
+    }
+  };
+
   const isLoading = isLoadingProject || isLoadingCollaborators;
 
   if (isLoading) {
@@ -180,8 +240,11 @@ export default function Team() {
                     collaborator={collaborator}
                     onInferProfile={() => handleInferProfile(collaborator)}
                     onDelete={() => handleDeleteCollaborator(collaborator.id)}
+                    onUpdateRole={(role) => handleUpdateRole(collaborator, role)}
+                    onAnalyzeRoleFit={() => handleAnalyzeRoleFit(collaborator)}
                     isInferring={inferringId === collaborator.id}
                     isDeleting={deletingId === collaborator.id}
+                    isAnalyzingFit={analyzingFitId === collaborator.id}
                   />
                 ))}
               </div>

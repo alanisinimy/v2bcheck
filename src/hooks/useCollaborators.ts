@@ -17,6 +17,8 @@ export interface Collaborator {
   disc_profile: DiscProfile | null;
   profile_source: 'pdf_auto' | 'ai_inferred' | 'manual';
   primary_style: 'D' | 'I' | 'S' | 'C' | null;
+  role_fit_level: 'alto' | 'medio' | 'baixo' | null;
+  role_fit_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +61,7 @@ export function useCollaborators(projectId: string | undefined) {
         ...row,
         disc_profile: parseDiscProfile(row.disc_profile),
         primary_style: row.primary_style as Collaborator['primary_style'],
+        role_fit_level: row.role_fit_level as Collaborator['role_fit_level'],
       })) as Collaborator[];
     },
     enabled: !!projectId,
@@ -92,6 +95,7 @@ export function useCreateCollaborator() {
         ...data,
         disc_profile: parseDiscProfile(data.disc_profile),
         primary_style: data.primary_style as Collaborator['primary_style'],
+        role_fit_level: data.role_fit_level as Collaborator['role_fit_level'],
       } as Collaborator;
     },
     onSuccess: (data) => {
@@ -133,6 +137,7 @@ export function useUpdateCollaborator() {
         ...data,
         disc_profile: parseDiscProfile(data.disc_profile),
         primary_style: data.primary_style as Collaborator['primary_style'],
+        role_fit_level: data.role_fit_level as Collaborator['role_fit_level'],
         projectId,
       } as Collaborator & { projectId: string };
     },
@@ -182,6 +187,32 @@ export function useInferProfile() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['collaborators', variables.projectId] });
       queryClient.invalidateQueries({ queryKey: ['evidences', variables.projectId] });
+    },
+  });
+}
+
+export function useAnalyzeRoleFit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ projectId, collaboratorId, collaboratorName, role, discProfile }: {
+      projectId: string;
+      collaboratorId: string;
+      collaboratorName: string;
+      role: string;
+      discProfile: DiscProfile;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('analyze-role-fit', {
+        body: { collaboratorId, collaboratorName, role, discProfile }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      
+      return data as { role_fit_level: string; role_fit_reason: string };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['collaborators', variables.projectId] });
     },
   });
 }
