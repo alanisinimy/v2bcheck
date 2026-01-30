@@ -188,17 +188,41 @@ A cultura da empresa valoriza resultados individuais sobre trabalho em equipe.
 [Nota: Implementar Whisper API na próxima iteração]`;
   }
   
-  // PDF files: placeholder for future OCR integration
+  // PDF files: extract text using pdf.js
   if (fileName.endsWith('.pdf')) {
-    return `[Documento PDF - ${file.name}]
-    
-Relatório de Performance Comercial Q4.
-Taxa de conversão: 22% (meta: 25%).
-Principais gargalos identificados: tempo de resposta ao lead > 48h.
-Stack tecnológica: Salesforce CRM + Planilhas Excel para forecast.
-Reuniões de pipeline: semanais, mas sem ata formal.
-
-[Nota: Implementar OCR na próxima iteração]`;
+    try {
+      const pdfjs = await import('pdfjs-dist');
+      
+      // Set worker source
+      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      
+      let fullText = '';
+      
+      // Extract text from all pages
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n\n';
+      }
+      
+      console.log(`Extracted ${fullText.length} chars from PDF (${pdf.numPages} pages)`);
+      
+      if (!fullText.trim()) {
+        console.warn('PDF has no extractable text - may be scanned/image-based');
+        return `[PDF sem texto extraível - ${file.name}]\n\nO PDF parece ser baseado em imagem/escaneado. Por favor, use um PDF com texto selecionável.`;
+      }
+      
+      return fullText;
+    } catch (error) {
+      console.error('Error extracting PDF text:', error);
+      return `[Erro ao extrair texto do PDF - ${file.name}]\n\nNão foi possível processar o PDF. Erro: ${error instanceof Error ? error.message : 'Desconhecido'}`;
+    }
   }
   
   // Unsupported file type
