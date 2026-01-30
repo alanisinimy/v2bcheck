@@ -213,10 +213,13 @@ export type Database = {
           created_at: string
           description: string | null
           effort: Database["public"]["Enums"]["initiative_effort"]
+          expected_impact: string | null
           id: string
           impact: Database["public"]["Enums"]["initiative_impact"]
           project_id: string
           reasoning: string | null
+          related_gaps: string[] | null
+          sequential_id: number | null
           status: Database["public"]["Enums"]["initiative_status"]
           target_pilar: Database["public"]["Enums"]["pilar"] | null
           title: string
@@ -226,10 +229,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           effort?: Database["public"]["Enums"]["initiative_effort"]
+          expected_impact?: string | null
           id?: string
           impact?: Database["public"]["Enums"]["initiative_impact"]
           project_id: string
           reasoning?: string | null
+          related_gaps?: string[] | null
+          sequential_id?: number | null
           status?: Database["public"]["Enums"]["initiative_status"]
           target_pilar?: Database["public"]["Enums"]["pilar"] | null
           title: string
@@ -239,10 +245,13 @@ export type Database = {
           created_at?: string
           description?: string | null
           effort?: Database["public"]["Enums"]["initiative_effort"]
+          expected_impact?: string | null
           id?: string
           impact?: Database["public"]["Enums"]["initiative_impact"]
           project_id?: string
           reasoning?: string | null
+          related_gaps?: string[] | null
+          sequential_id?: number | null
           status?: Database["public"]["Enums"]["initiative_status"]
           target_pilar?: Database["public"]["Enums"]["pilar"] | null
           title?: string
