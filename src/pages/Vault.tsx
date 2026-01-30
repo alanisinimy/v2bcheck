@@ -96,11 +96,23 @@ export default function Vault() {
 
             // Invalidate evidences query to refresh Matriz
             queryClient.invalidateQueries({ queryKey: ['evidences', currentProject.id] });
-
-            toast({
-              title: 'IA processou o arquivo',
-              description: `${result.count} evidências extraídas de ${file.name}.`,
-            });
+            
+            // If it's a DISC profile, also invalidate collaborators
+            if (sourceType === 'perfil_disc') {
+              queryClient.invalidateQueries({ queryKey: ['collaborators', currentProject.id] });
+              
+              if (result.collaborator) {
+                toast({
+                  title: result.isNewCollaborator ? 'Colaborador cadastrado' : 'Perfil atualizado',
+                  description: `${result.collaborator.name} foi ${result.isNewCollaborator ? 'adicionado ao time' : 'atualizado'} automaticamente.`,
+                });
+              }
+            } else {
+              toast({
+                title: 'IA processou o arquivo',
+                description: `${result.count} evidências extraídas de ${file.name}.`,
+              });
+            }
           }
         } else {
           // File type not supported for text extraction

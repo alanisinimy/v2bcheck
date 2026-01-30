@@ -20,6 +20,11 @@ interface ExtractedEvidence {
 interface AnalyzeResult {
   count: number;
   error?: string;
+  collaborator?: {
+    id: string;
+    name: string;
+  };
+  isNewCollaborator?: boolean;
 }
 
 // Deduplicate evidences by normalized content
@@ -50,9 +55,15 @@ export async function analyzeEvidences({
   sourceType,
 }: AnalyzeEvidencesParams): Promise<AnalyzeResult> {
   try {
+    // If it's a DISC profile, use the specialized function
+    if (sourceType === 'perfil_disc') {
+      return await analyzeDiscProfile({ projectId, assetId, content });
+    }
+
     // Format source description with source type
     const sourceConfig = SOURCE_TYPES[sourceType];
     const formattedSource = `${sourceConfig.icon} ${sourceConfig.label} • ${sourceDescription}`;
+    
     // Call the Edge Function
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
       body: { content }
@@ -109,6 +120,47 @@ export async function analyzeEvidences({
     return { 
       count: 0, 
       error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+
+// Specialized function for DISC profile analysis
+async function analyzeDiscProfile({
+  projectId,
+  assetId,
+  content,
+}: {
+  projectId: string;
+  assetId: string;
+  content: string;
+}): Promise<AnalyzeResult> {
+  try {
+    const { data, error: functionError } = await supabase.functions.invoke('analyze-disc', {
+      body: { projectId, assetId, content }
+    });
+
+    if (functionError) {
+      console.error('analyze-disc error:', functionError);
+      throw new Error(functionError.message || 'Failed to analyze DISC profile');
+    }
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return {
+      count: 1, // One evidence is created automatically by the edge function
+      collaborator: data.collaborator ? {
+        id: data.collaborator.id,
+        name: data.collaborator.name,
+      } : undefined,
+      isNewCollaborator: data.isNew,
+    };
+  } catch (error) {
+    console.error('analyzeDiscProfile error:', error);
+    return {
+      count: 0,
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }

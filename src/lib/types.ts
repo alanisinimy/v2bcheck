@@ -13,7 +13,8 @@ export type SourceType =
   | 'reuniao_vendas'
   | 'briefing'
   | 'documentacao'
-  | 'observacao_consultor';
+  | 'observacao_consultor'
+  | 'perfil_disc';
 
 export type EvidenceType = 'fato' | 'divergencia' | 'ponto_forte';
 
@@ -25,6 +26,7 @@ export const SOURCE_TYPES: Record<SourceType, { label: string; icon: string }> =
   briefing: { label: 'Briefing / Formulário', icon: '📝' },
   documentacao: { label: 'Documentação Técnica', icon: '📄' },
   observacao_consultor: { label: 'Observação do Consultor', icon: '👁️' },
+  perfil_disc: { label: 'Perfil DISC', icon: '📋' },
 };
 
 export const EVIDENCE_TYPES: Record<EvidenceType, { label: string; icon: string; color: string }> = {

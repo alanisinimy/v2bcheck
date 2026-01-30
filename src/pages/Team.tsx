@@ -1,0 +1,229 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Plus, Users } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
+import { Button } from '@/components/ui/button';
+import { CollaboratorCard } from '@/components/team/CollaboratorCard';
+import { AddCollaboratorDialog } from '@/components/team/AddCollaboratorDialog';
+import { TeamDistributionChart } from '@/components/team/DiscProfileBars';
+import { useProjectContext } from '@/contexts/ProjectContext';
+import {
+  useCollaborators,
+  useCreateCollaborator,
+  useDeleteCollaborator,
+  useInferProfile,
+  useTeamDistribution,
+} from '@/hooks/useCollaborators';
+import { toast } from '@/hooks/use-toast';
+
+export default function Team() {
+  const { currentProject, isLoading: isLoadingProject } = useProjectContext();
+  const { data: collaborators = [], isLoading: isLoadingCollaborators } = useCollaborators(currentProject?.id);
+  const createMutation = useCreateCollaborator();
+  const deleteMutation = useDeleteCollaborator();
+  const inferMutation = useInferProfile();
+  
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [inferringId, setInferringId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const distribution = useTeamDistribution(collaborators);
+
+  const handleAddCollaborator = async (data: { name: string; role?: string }) => {
+    if (!currentProject) return;
+    
+    try {
+      await createMutation.mutateAsync({
+        projectId: currentProject.id,
+        ...data,
+      });
+      
+      toast({
+        title: 'Colaborador adicionado',
+        description: `${data.name} foi adicionado ao time.`,
+      });
+      
+      setIsAddDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao adicionar',
+        description: error.message || 'Não foi possível adicionar o colaborador.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleInferProfile = async (collaborator: { id: string; name: string }) => {
+    if (!currentProject) return;
+    
+    setInferringId(collaborator.id);
+    
+    try {
+      const result = await inferMutation.mutateAsync({
+        projectId: currentProject.id,
+        collaboratorId: collaborator.id,
+        collaboratorName: collaborator.name,
+      });
+      
+      toast({
+        title: 'Perfil inferido',
+        description: `O perfil DISC de ${collaborator.name} foi estimado pela IA.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro na inferência',
+        description: error.message || 'Não foi possível inferir o perfil.',
+        variant: 'destructive',
+      });
+    } finally {
+      setInferringId(null);
+    }
+  };
+
+  const handleDeleteCollaborator = async (id: string) => {
+    if (!currentProject) return;
+    
+    setDeletingId(id);
+    
+    try {
+      await deleteMutation.mutateAsync({
+        id,
+        projectId: currentProject.id,
+      });
+      
+      toast({
+        title: 'Colaborador removido',
+        description: 'O colaborador foi removido do time.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao remover',
+        description: error.message || 'Não foi possível remover o colaborador.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const isLoading = isLoadingProject || isLoadingCollaborators;
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!currentProject) {
+    return (
+      <AppLayout>
+        <EmptyProjectState />
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <div className="p-8">
+        {/* Header */}
+        <motion.header
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between mb-8"
+        >
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Time do Projeto
+            </h1>
+            <p className="text-muted-foreground">
+              Colaboradores mapeados com perfil DISC
+            </p>
+          </div>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Adicionar Manual
+          </Button>
+        </motion.header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Collaborators Grid */}
+          <div className="lg:col-span-2">
+            {collaborators.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-16 glass rounded-xl border border-border/50"
+              >
+                <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Nenhum colaborador mapeado
+                </h3>
+                <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                  Faça upload de PDFs DISC no Vault para cadastrar automaticamente, 
+                  ou adicione manualmente para depois inferir o perfil via IA.
+                </p>
+                <Button onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Colaborador
+                </Button>
+              </motion.div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {collaborators.map((collaborator) => (
+                  <CollaboratorCard
+                    key={collaborator.id}
+                    collaborator={collaborator}
+                    onInferProfile={() => handleInferProfile(collaborator)}
+                    onDelete={() => handleDeleteCollaborator(collaborator.id)}
+                    isInferring={inferringId === collaborator.id}
+                    isDeleting={deletingId === collaborator.id}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Team Distribution Sidebar */}
+          <div className="lg:col-span-1">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="glass rounded-xl p-6 border border-border/50 sticky top-8"
+            >
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                Distribuição DISC do Time
+              </h2>
+              
+              {distribution.total > 0 ? (
+                <>
+                  <TeamDistributionChart distribution={distribution} />
+                  <p className="text-sm text-muted-foreground mt-4">
+                    {distribution.total} colaborador{distribution.total !== 1 ? 'es' : ''} com perfil mapeado
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  Nenhum perfil DISC mapeado ainda.
+                  Faça upload de PDFs ou use a inferência via IA.
+                </p>
+              )}
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Add Collaborator Dialog */}
+        <AddCollaboratorDialog
+          isOpen={isAddDialogOpen}
+          onClose={() => setIsAddDialogOpen(false)}
+          onConfirm={handleAddCollaborator}
+          isLoading={createMutation.isPending}
+        />
+      </div>
+    </AppLayout>
+  );
+}

@@ -67,6 +67,50 @@ export type Database = {
           },
         ]
       }
+      collaborators: {
+        Row: {
+          created_at: string
+          disc_profile: Json | null
+          id: string
+          name: string
+          primary_style: string | null
+          profile_source: Database["public"]["Enums"]["profile_source_type"]
+          project_id: string
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          disc_profile?: Json | null
+          id?: string
+          name: string
+          primary_style?: string | null
+          profile_source?: Database["public"]["Enums"]["profile_source_type"]
+          project_id: string
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          disc_profile?: Json | null
+          id?: string
+          name?: string
+          primary_style?: string | null
+          profile_source?: Database["public"]["Enums"]["profile_source_type"]
+          project_id?: string
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evidences: {
         Row: {
           asset_id: string | null
@@ -136,6 +180,56 @@ export type Database = {
           },
         ]
       }
+      initiatives: {
+        Row: {
+          created_at: string
+          description: string | null
+          effort: Database["public"]["Enums"]["initiative_effort"]
+          id: string
+          impact: Database["public"]["Enums"]["initiative_impact"]
+          project_id: string
+          reasoning: string | null
+          status: Database["public"]["Enums"]["initiative_status"]
+          target_pilar: Database["public"]["Enums"]["pilar"] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          effort?: Database["public"]["Enums"]["initiative_effort"]
+          id?: string
+          impact?: Database["public"]["Enums"]["initiative_impact"]
+          project_id: string
+          reasoning?: string | null
+          status?: Database["public"]["Enums"]["initiative_status"]
+          target_pilar?: Database["public"]["Enums"]["pilar"] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          effort?: Database["public"]["Enums"]["initiative_effort"]
+          id?: string
+          impact?: Database["public"]["Enums"]["initiative_impact"]
+          project_id?: string
+          reasoning?: string | null
+          status?: Database["public"]["Enums"]["initiative_status"]
+          target_pilar?: Database["public"]["Enums"]["pilar"] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "initiatives_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           client_context: string | null
@@ -186,7 +280,11 @@ export type Database = {
       asset_status: "uploading" | "processing" | "completed" | "error"
       evidence_status: "pendente" | "validado" | "rejeitado" | "investigar"
       evidence_type: "fato" | "divergencia" | "ponto_forte"
+      initiative_effort: "low" | "medium" | "high"
+      initiative_impact: "low" | "medium" | "high"
+      initiative_status: "draft" | "approved" | "in_progress" | "done"
       pilar: "pessoas" | "processos" | "dados" | "tecnologia" | "gestao"
+      profile_source_type: "pdf_auto" | "ai_inferred" | "manual"
       source_type:
         | "entrevista_diretoria"
         | "entrevista_operacao"
@@ -195,6 +293,7 @@ export type Database = {
         | "briefing"
         | "documentacao"
         | "observacao_consultor"
+        | "perfil_disc"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -325,7 +424,11 @@ export const Constants = {
       asset_status: ["uploading", "processing", "completed", "error"],
       evidence_status: ["pendente", "validado", "rejeitado", "investigar"],
       evidence_type: ["fato", "divergencia", "ponto_forte"],
+      initiative_effort: ["low", "medium", "high"],
+      initiative_impact: ["low", "medium", "high"],
+      initiative_status: ["draft", "approved", "in_progress", "done"],
       pilar: ["pessoas", "processos", "dados", "tecnologia", "gestao"],
+      profile_source_type: ["pdf_auto", "ai_inferred", "manual"],
       source_type: [
         "entrevista_diretoria",
         "entrevista_operacao",
@@ -334,6 +437,7 @@ export const Constants = {
         "briefing",
         "documentacao",
         "observacao_consultor",
+        "perfil_disc",
       ],
     },
   },
