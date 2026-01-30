@@ -8,6 +8,7 @@ interface AnalyzeEvidencesParams {
   content: string;
   sourceDescription: string;
   sourceType: SourceType;
+  collaboratorId?: string;
 }
 
 interface ExtractedEvidence {
@@ -53,6 +54,7 @@ export async function analyzeEvidences({
   content,
   sourceDescription,
   sourceType,
+  collaboratorId,
 }: AnalyzeEvidencesParams): Promise<AnalyzeResult> {
   try {
     // If it's a DISC profile, use the specialized function
@@ -64,9 +66,9 @@ export async function analyzeEvidences({
     const sourceConfig = SOURCE_TYPES[sourceType];
     const formattedSource = `${sourceConfig.icon} ${sourceConfig.label} • ${sourceDescription}`;
     
-    // Call the Edge Function
+    // Call the Edge Function with collaborator context
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
-      body: { content }
+      body: { content, collaboratorId }
     });
 
     if (functionError) {

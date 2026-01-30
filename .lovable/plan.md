@@ -2,13 +2,15 @@
 
 # Plano: Upgrade de Inteligência do Sistema de Evidências
 
+**Status: ✅ IMPLEMENTADO**
+
 ## Resumo
 
-Implementar três melhorias críticas no sistema de extração de evidências:
+Três melhorias críticas implementadas no sistema de extração de evidências:
 
-1. **O Cérebro**: A IA lê o contexto do colaborador (DISC, histórico) antes de analisar seus arquivos
-2. **O Filtro**: Regras de exclusão para ignorar conversas sobre a consultoria Vendas2B
-3. **A Faxina**: Botão para consolidar evidências duplicadas semanticamente
+1. ✅ **O Cérebro**: A IA lê o contexto do colaborador (DISC, histórico) antes de analisar seus arquivos
+2. ✅ **O Filtro**: Regras de exclusão para ignorar conversas sobre a consultoria Vendas2B
+3. ✅ **A Faxina**: Botão para consolidar evidências duplicadas semanticamente
 
 ## Arquitetura da Solução
 

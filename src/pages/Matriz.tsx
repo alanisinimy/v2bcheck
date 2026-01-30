@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { EvidenceCard } from '@/components/matriz/EvidenceCard';
@@ -9,6 +9,7 @@ import { AddEvidenceDialog } from '@/components/matriz/AddEvidenceDialog';
 import { Button } from '@/components/ui/button';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEvidences, useUpdateEvidenceStatus } from '@/hooks/useProject';
+import { useConsolidateEvidences } from '@/hooks/useConsolidateEvidences';
 import type { Pilar, EvidenceStatus } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 
@@ -16,6 +17,7 @@ export default function Matriz() {
   const { currentProject, isLoading: isLoadingProject } = useProjectContext();
   const { data: evidences = [], isLoading: isLoadingEvidences } = useEvidences(currentProject?.id);
   const updateStatusMutation = useUpdateEvidenceStatus();
+  const consolidateMutation = useConsolidateEvidences();
   
   const [selectedPilar, setSelectedPilar] = useState<Pilar | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<EvidenceStatus | 'all'>('all');
@@ -48,6 +50,25 @@ export default function Matriz() {
       toast({
         title: 'Erro ao atualizar',
         description: 'Não foi possível atualizar o status da evidência.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleConsolidate = async () => {
+    if (!currentProject) return;
+
+    try {
+      const result = await consolidateMutation.mutateAsync(currentProject.id);
+      
+      toast({
+        title: '🧹 Consolidação concluída!',
+        description: `${result.stats.evidences_archived} evidências redundantes arquivadas. Matriz mais limpa!`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro na consolidação',
+        description: error instanceof Error ? error.message : 'Não foi possível consolidar as evidências.',
         variant: 'destructive',
       });
     }
@@ -92,13 +113,33 @@ export default function Matriz() {
                 Mesa de trabalho do consultor. Valide, rejeite ou investigue cada evidência.
               </p>
             </div>
-            <Button
-              onClick={() => setIsAddDialogOpen(true)}
-              className="gap-2 bg-primary hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Evidência
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleConsolidate}
+                variant="outline"
+                disabled={consolidateMutation.isPending || evidences.length < 5}
+                className="gap-2"
+              >
+                {consolidateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    A IA está organizando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Consolidar Evidências
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={() => setIsAddDialogOpen(true)}
+                className="gap-2 bg-primary hover:bg-primary/90"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Evidência
+              </Button>
+            </div>
           </div>
         </motion.header>
 
