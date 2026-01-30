@@ -49,7 +49,7 @@ serve(async (req) => {
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: `Analise este texto e extraia as evidências:\n\n${content}` }
