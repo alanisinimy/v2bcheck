@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.consolidate-evidences]
 verify_jwt = false
+
+[functions.analyze-people-data]
+verify_jwt = false

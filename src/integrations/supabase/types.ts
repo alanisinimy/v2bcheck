@@ -366,6 +366,7 @@ export type Database = {
         | "perfil_disc"
         | "reuniao_diagnostico"
         | "reuniao_planejamento"
+        | "pesquisa_clima"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -512,6 +513,7 @@ export const Constants = {
         "perfil_disc",
         "reuniao_diagnostico",
         "reuniao_planejamento",
+        "pesquisa_clima",
       ],
     },
   },
