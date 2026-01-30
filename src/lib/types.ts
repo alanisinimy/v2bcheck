@@ -18,7 +18,7 @@ export type SourceType =
 
 export type EvidenceType = 'fato' | 'divergencia' | 'ponto_forte';
 
-export type ImpactType = 'receita' | 'eficiencia' | 'risco';
+export type ImpactType = 'receita' | 'eficiencia' | 'risco' | 'cultura';
 
 export type CriticalityType = 'alta' | 'media' | 'baixa';
 
@@ -43,6 +43,7 @@ export const IMPACT_CONFIG: Record<ImpactType, { label: string; icon: string }> 
   receita: { label: 'Receita', icon: 'TrendingUp' },
   eficiencia: { label: 'Eficiência', icon: 'Zap' },
   risco: { label: 'Risco', icon: 'AlertTriangle' },
+  cultura: { label: 'Cultura', icon: 'Users' },
 };
 
 export const CRITICALITY_CONFIG: Record<CriticalityType, { label: string; color: string }> = {

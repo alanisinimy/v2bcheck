@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Pilar, SourceType } from '@/lib/types';
+import type { Pilar, SourceType, ImpactType, CriticalityType } from '@/lib/types';
 import { SOURCE_TYPES } from '@/lib/types';
 
 interface AnalyzeEvidencesParams {
@@ -11,9 +11,13 @@ interface AnalyzeEvidencesParams {
   collaboratorId?: string;
 }
 
-interface ExtractedEvidence {
-  content: string;
+// New interface matching the edge function output
+interface ExtractedGap {
+  gap: string;
   pilar: Pilar;
+  benchmark: string;
+  impacto: ImpactType;
+  criticidade: CriticalityType;
   is_divergence: boolean;
   divergence_description?: string;
 }
@@ -26,26 +30,6 @@ interface AnalyzeResult {
     name: string;
   };
   isNewCollaborator?: boolean;
-}
-
-// Deduplicate evidences by normalized content
-function deduplicateEvidences(evidences: ExtractedEvidence[]): ExtractedEvidence[] {
-  const seen = new Map<string, ExtractedEvidence>();
-  
-  for (const evidence of evidences) {
-    // Normalize: trim, lowercase, collapse whitespace
-    const normalizedContent = evidence.content
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
-    
-    // Keep only the first occurrence
-    if (!seen.has(normalizedContent)) {
-      seen.set(normalizedContent, evidence);
-    }
-  }
-  
-  return Array.from(seen.values());
 }
 
 export async function analyzeEvidences({
@@ -80,31 +64,29 @@ export async function analyzeEvidences({
       throw new Error(data.error);
     }
 
-    const evidences: ExtractedEvidence[] = data.evidences;
+    // Now receives 'gaps' instead of 'evidences'
+    const gaps: ExtractedGap[] = data.gaps;
 
-    if (!evidences || evidences.length === 0) {
+    if (!gaps || gaps.length === 0) {
       return { count: 0 };
     }
 
-    // Deduplicate evidences before inserting
-    const uniqueEvidences = deduplicateEvidences(evidences);
-    
-    console.log(`Deduplication: ${evidences.length} → ${uniqueEvidences.length} evidences`);
+    console.log(`Received ${gaps.length} strategic gaps from AI`);
 
-    if (uniqueEvidences.length === 0) {
-      return { count: 0 };
-    }
-
-    // Batch insert unique evidences into the database
-    const evidencesToInsert = uniqueEvidences.map((ev) => ({
+    // Map gaps to evidences table structure
+    const evidencesToInsert = gaps.map((gap) => ({
       project_id: projectId,
       asset_id: assetId,
-      pilar: ev.pilar,
-      content: ev.content,
+      pilar: gap.pilar,
+      content: gap.gap,
+      benchmark: gap.benchmark,
+      impact: gap.impacto,
+      criticality: gap.criticidade,
       source_description: formattedSource,
       status: 'pendente' as const,
-      is_divergence: ev.is_divergence || false,
-      divergence_description: ev.divergence_description || null,
+      is_divergence: gap.is_divergence || false,
+      divergence_description: gap.divergence_description || null,
+      evidence_type: gap.is_divergence ? 'divergencia' as const : 'fato' as const,
     }));
 
     const { error: insertError } = await supabase
@@ -112,11 +94,11 @@ export async function analyzeEvidences({
       .insert(evidencesToInsert);
 
     if (insertError) {
-      console.error('Failed to insert evidences:', insertError);
-      throw new Error('Failed to save evidences to database');
+      console.error('Failed to insert gaps:', insertError);
+      throw new Error('Failed to save gaps to database');
     }
 
-    return { count: uniqueEvidences.length };
+    return { count: gaps.length };
   } catch (error) {
     console.error('analyzeEvidences error:', error);
     return { 
