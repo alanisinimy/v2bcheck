@@ -1,12 +1,27 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileAudio, FileVideo, FileText, FileSpreadsheet, Check, Loader2, AlertCircle } from 'lucide-react';
+import { FileAudio, FileVideo, FileText, FileSpreadsheet, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface AssetCardProps {
   asset: Asset;
   index: number;
+  onDelete?: (assetId: string, storagePath: string) => void;
+  isDeleting?: boolean;
 }
 
 function getFileIcon(fileType: string) {
@@ -22,8 +37,14 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AssetCard({ asset, index }: AssetCardProps) {
+export function AssetCard({ asset, index, onDelete, isDeleting }: AssetCardProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const Icon = getFileIcon(asset.file_type);
+
+  const handleDelete = () => {
+    onDelete?.(asset.id, asset.storage_path);
+    setIsDialogOpen(false);
+  };
   
   const statusConfig = {
     uploading: {
@@ -93,6 +114,43 @@ export function AssetCard({ asset, index }: AssetCardProps) {
         <StatusIcon className={cn('w-3.5 h-3.5', status.animate && 'animate-spin')} />
         <span>{status.label}</span>
       </div>
+
+      {/* Delete Button */}
+      {onDelete && (
+        <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir arquivo?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita. O arquivo "{asset.file_name}" e todas as evidências associadas serão permanentemente excluídos.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </motion.div>
   );
 }

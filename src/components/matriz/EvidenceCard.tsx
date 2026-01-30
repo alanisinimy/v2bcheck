@@ -105,7 +105,7 @@ export function EvidenceCard({ evidence, onStatusChange, index }: EvidenceCardPr
             'flex-1 active-scale',
             evidence.status === 'validado' && 'bg-success hover:bg-success/90 text-success-foreground'
           )}
-          onClick={() => onStatusChange(evidence.id, 'validado')}
+          onClick={() => onStatusChange(evidence.id, evidence.status === 'validado' ? 'pendente' : 'validado')}
         >
           <Check className="w-4 h-4 mr-1" />
           Validar
@@ -117,7 +117,7 @@ export function EvidenceCard({ evidence, onStatusChange, index }: EvidenceCardPr
             'flex-1 active-scale',
             evidence.status === 'rejeitado' && 'bg-destructive hover:bg-destructive/90'
           )}
-          onClick={() => onStatusChange(evidence.id, 'rejeitado')}
+          onClick={() => onStatusChange(evidence.id, evidence.status === 'rejeitado' ? 'pendente' : 'rejeitado')}
         >
           <X className="w-4 h-4 mr-1" />
           Rejeitar
@@ -129,7 +129,7 @@ export function EvidenceCard({ evidence, onStatusChange, index }: EvidenceCardPr
             'active-scale',
             evidence.status === 'investigar' && 'bg-warning hover:bg-warning/90 text-warning-foreground'
           )}
-          onClick={() => onStatusChange(evidence.id, 'investigar')}
+          onClick={() => onStatusChange(evidence.id, evidence.status === 'investigar' ? 'pendente' : 'investigar')}
         >
           <Flag className="w-4 h-4" />
         </Button>

@@ -191,3 +191,44 @@ export function useUpdateAssetStatus() {
     },
   });
 }
+
+// Delete asset (storage file + evidences + asset record)
+export function useDeleteAsset() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ assetId, storagePath, projectId }: { assetId: string; storagePath: string; projectId: string }) => {
+      // 1. Remove file from storage
+      const { error: storageError } = await supabase.storage
+        .from('project-files')
+        .remove([storagePath]);
+      
+      if (storageError) {
+        console.error('Storage delete error:', storageError);
+        // Continue even if storage delete fails (file might not exist)
+      }
+      
+      // 2. Delete associated evidences
+      const { error: evidencesError } = await supabase
+        .from('evidences')
+        .delete()
+        .eq('asset_id', assetId);
+      
+      if (evidencesError) throw evidencesError;
+      
+      // 3. Delete asset record
+      const { error: assetError } = await supabase
+        .from('assets')
+        .delete()
+        .eq('id', assetId);
+      
+      if (assetError) throw assetError;
+      
+      return { assetId, projectId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['assets', data.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['evidences', data.projectId] });
+    },
+  });
+}
