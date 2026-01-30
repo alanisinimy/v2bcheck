@@ -2,3 +2,12 @@ project_id = "nvbqurstnjryhtmqhucv"
 
 [functions.analyze-evidences]
 verify_jwt = false
+
+[functions.analyze-disc]
+verify_jwt = false
+
+[functions.infer-disc-profile]
+verify_jwt = false
+
+[functions.generate-strategic-plan]
+verify_jwt = false

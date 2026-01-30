@@ -26,6 +26,7 @@ const sourceTypeOptions: SourceType[] = [
   'reuniao_vendas',
   'briefing',
   'documentacao',
+  'perfil_disc',
 ];
 
 export function SourceTypeModal({ isOpen, fileName, onConfirm, onCancel }: SourceTypeModalProps) {

@@ -7,6 +7,8 @@ import { ProjectProvider } from "@/contexts/ProjectContext";
 import Dashboard from "./pages/Dashboard";
 import Vault from "./pages/Vault";
 import Matriz from "./pages/Matriz";
+import Team from "./pages/Team";
+import Plan from "./pages/Plan";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +24,8 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/vault" element={<Vault />} />
             <Route path="/matriz" element={<Matriz />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/plan" element={<Plan />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

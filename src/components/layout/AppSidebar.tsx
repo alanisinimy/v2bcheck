@@ -1,4 +1,4 @@
-import { LayoutDashboard, Upload, Grid3X3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Upload, Grid3X3, ChevronLeft, ChevronRight, Users, Lightbulb } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -20,6 +20,16 @@ const navItems = [
     label: 'Matriz de Diagnóstico',
     icon: Grid3X3,
     path: '/matriz',
+  },
+  {
+    label: 'Time',
+    icon: Users,
+    path: '/team',
+  },
+  {
+    label: 'Plano Estratégico',
+    icon: Lightbulb,
+    path: '/plan',
   },
 ];
 
