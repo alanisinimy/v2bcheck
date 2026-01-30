@@ -1,62 +1,60 @@
 
 
-# Melhorias no Vault e Matriz de Evidências
+# Correção de Cards Duplicados na Matriz de Diagnóstico
 
-Duas funcionalidades serão implementadas:
+O problema é causado por **evidências duplicadas no banco de dados** - o modelo de IA está retornando insights repetidos que são inseridos sem verificação.
 
 ---
 
-## 1. Exclusão de Arquivos no Vault
+## Diagnóstico
 
-Adicionar botão de lixeira no `AssetCard` para deletar arquivos enviados.
-
-**Fluxo:**
-- Usuário clica no ícone de lixeira
-- Modal de confirmação aparece
-- Ao confirmar: deleta arquivo do Storage e remove registro do banco
-
-**Arquivos a modificar:**
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/vault/AssetCard.tsx` | Adicionar botão delete + modal de confirmação |
-| `src/hooks/useProject.ts` | Criar hook `useDeleteAsset` |
-| `src/pages/Vault.tsx` | Passar callback de delete para AssetCard |
-
-**Novo hook `useDeleteAsset`:**
 ```text
-1. Remove arquivo do storage: supabase.storage.from('project-files').remove([path])
-2. Deleta evidências associadas: DELETE FROM evidences WHERE asset_id = ?
-3. Deleta registro do asset: DELETE FROM assets WHERE id = ?
-4. Invalida queries
+Evidência duplicada encontrada:
+├── Conteúdo: "Cristian Alicke menciona que a equipe de vendas não tem um processo claro de follow-up..."
+├── IDs diferentes: 40e04398-... e cd40030b-...
+├── Mesmo asset_id: 9af14767-8143-467f-93f7-965d2c134678  
+├── Mesmo created_at: 2026-01-30 00:21:01.167542+00
+└── Causa: IA retornou a mesma evidência mais de uma vez
 ```
 
 ---
 
-## 2. Toggle de Status nas Evidências
+## Solução
 
-Alterar comportamento dos botões Validar/Rejeitar/Investigar para funcionar como toggle.
+### 1. Deduplicação no Hook de Análise
 
-**Comportamento atual:**
-- Clicar "Validar" sempre define status = `validado`
-
-**Novo comportamento:**
-- Clicar "Validar" quando já está `validado` → volta para `pendente`
-- Clicar "Rejeitar" quando já está `rejeitado` → volta para `pendente`
-- Clicar "Investigar" quando já está `investigar` → volta para `pendente`
-
-**Arquivo a modificar:**
+Modificar `src/hooks/useAnalyzeEvidences.ts` para remover duplicatas antes de inserir:
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/matriz/EvidenceCard.tsx` | Adicionar lógica de toggle nos onClick |
+| `src/hooks/useAnalyzeEvidences.ts` | Adicionar lógica de deduplicação por conteúdo |
 
-**Lógica no onClick:**
+**Lógica:**
 ```text
-onClick={() => onStatusChange(
-  evidence.id, 
-  evidence.status === 'validado' ? 'pendente' : 'validado'
-)}
+1. Recebe array de evidências da IA
+2. Cria Map com chave = content normalizado
+3. Extrai valores únicos do Map
+4. Insere apenas as evidências únicas
+```
+
+---
+
+### 2. Limpeza de Duplicatas Existentes (Migração SQL)
+
+Remover duplicatas já existentes no banco de dados, mantendo apenas a primeira ocorrência:
+
+| Arquivo | Ação |
+|---------|------|
+| Nova migração SQL | DELETE duplicatas mantendo 1 cópia |
+
+**SQL:**
+```text
+DELETE FROM evidences 
+WHERE id NOT IN (
+  SELECT MIN(id) 
+  FROM evidences 
+  GROUP BY project_id, asset_id, content
+);
 ```
 
 ---
@@ -65,15 +63,14 @@ onClick={() => onStatusChange(
 
 | Componente | Mudança |
 |------------|---------|
-| `AssetCard` | + botão lixeira, + dialog confirmação, + props onDelete |
-| `Vault.tsx` | + handler delete, + feedback toast |
-| `useProject.ts` | + hook `useDeleteAsset` |
-| `EvidenceCard` | Lógica toggle nos 3 botões de status |
+| `useAnalyzeEvidences.ts` | + função `deduplicateEvidences()` antes do insert |
+| Migração SQL | Limpa duplicatas existentes |
 
 ---
 
 ## Resultado Esperado
 
-1. No Vault: botão de lixeira em cada arquivo → confirma → deleta arquivo e evidências associadas
-2. Na Matriz: clicar em "Validar" de novo desmarca e volta para "Pendente"
+1. Evidências duplicadas existentes são removidas do banco
+2. Novos uploads não inserem evidências com mesmo conteúdo
+3. Matriz de Diagnóstico mostra cada insight apenas uma vez
 
