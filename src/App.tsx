@@ -34,7 +34,8 @@ const App = () => (
               <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
               <Route path="/plan" element={<ProtectedRoute><Plan /></ProtectedRoute>} />
               <Route path="/projeto/novo" element={<ProtectedRoute><ProjetoSetupPage /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
+              <Route path="/settings/pilares" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/settings/team" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Routes>
           </BrowserRouter>
         </ProjectProvider>
