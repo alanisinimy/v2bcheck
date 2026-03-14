@@ -3,12 +3,13 @@ import { motion } from 'framer-motion';
 import { Plus, Users, Upload, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
+import { PageHeader } from '@/shared/components/PageHeader';
 import { Button } from '@/components/ui/button';
-import { CollaboratorCard } from '@/components/team/CollaboratorCard';
-import { AddCollaboratorDialog } from '@/components/team/AddCollaboratorDialog';
-import { PeopleDataUploadZone } from '@/components/team/PeopleDataUploadZone';
-import { PeopleDataBatchModal, type ClassifiedFile } from '@/components/team/PeopleDataBatchModal';
-import { TeamDistributionChart } from '@/components/team/DiscProfileBars';
+import { CollaboratorCard } from '@/features/time/components/CollaboratorCard';
+import { AddCollaboratorDialog } from '@/features/time/components/AddCollaboratorDialog';
+import { PeopleDataUploadZone } from '@/features/time/components/PeopleDataUploadZone';
+import { PeopleDataBatchModal, type ClassifiedFile } from '@/features/time/components/PeopleDataBatchModal';
+import { TeamDistributionChart } from '@/features/time/components/DiscProfileBars';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import {
   useCollaborators,
