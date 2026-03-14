@@ -327,34 +327,26 @@ export default function Team() {
     <AppLayout>
       <div className="p-8">
         {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
-        >
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Time do Projeto
-            </h1>
-            <p className="text-muted-foreground">
-              Colaboradores mapeados com perfil DISC
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="outline"
-              onClick={() => setShowUploadZone(!showUploadZone)}
-              className="gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Dados de Pessoas
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Manual
-            </Button>
-          </div>
-        </motion.header>
+        <PageHeader
+          title="Time do Projeto"
+          description="Colaboradores mapeados com perfil DISC"
+          actions={
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => setShowUploadZone(!showUploadZone)}
+                className="gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Dados de Pessoas
+              </Button>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Manual
+              </Button>
+            </>
+          }
+        />
 
         {/* People Data Upload Zone (Collapsible) */}
         {showUploadZone && (
