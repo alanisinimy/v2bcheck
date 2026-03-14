@@ -1,38 +1,112 @@
 
 
-## Plano: Página de Configurações com aba "Equipe & Acessos"
+# Plano: Adicionar Coluna de Status na Matriz de Gaps
 
-Criar uma nova página `/settings` com duas abas (Pilares & Framework, Equipe & Acessos), seguindo o design do screenshot fornecido. A sidebar já aponta para `/settings/pilares` e `/settings/team`.
+## Objetivo
+Exibir o status de cada evidência/gap diretamente na tabela da Matriz, permitindo visualização rápida do estado de validação sem precisar abrir o menu de ações.
 
-### Arquivos a criar
+---
 
-1. **`src/pages/Settings.tsx`** — Página principal com tabs (Pilares & Framework / Equipe & Acessos). Usa `AppLayout` e `PageHeader`. A URL `/settings/pilares` e `/settings/team` controlam a aba ativa.
+## 1. Alterações no Componente da Tabela
 
-2. **`src/features/settings/components/TeamAccessTab.tsx`** — Aba "Equipe & Acessos" com:
-   - **Stats cards**: Membros ativos, Convites pendentes, Projetos vinculados (3 cards em grid)
-   - **Convidar Membro**: Form com Email + Nome + botão "+ Enviar Convite" (verde)
-   - **Membros da Equipe**: Lista de `project_members` com avatar (iniciais coloridas), nome, email, badge de role (Admin/Owner/Pendente), status de último acesso, e botões de ação (Remover, Reenviar, Cancelar)
-   - **Zona de Risco**: Card vermelho com "Transferir ownership da conta"
-   - Dados vêm das tabelas `project_members` e `project_invites`
+### `src/components/matriz/EvidenceTable.tsx`
 
-3. **`src/features/settings/components/PilaresTab.tsx`** — Aba "Pilares & Framework" que reutiliza o `StepConfigurarPilares` existente para editar os pilares do projeto atual
+Adicionar nova coluna "Status" no cabeçalho:
 
-4. **`src/features/settings/hooks/useProjectMembers.ts`** — Hook para CRUD de membros e convites (query `project_members` + `project_invites`, mutations para invite/remove/cancel)
+**Antes:**
+```
+ID | Pilar | Gap Identificado | Benchmark | Impacto | Criticidade | Ações
+```
 
-### Arquivos a editar
+**Depois:**
+```
+ID | Pilar | Gap Identificado | Benchmark | Impacto | Criticidade | Status | Ações
+```
 
-5. **`src/App.tsx`** — Adicionar rotas `/settings/pilares` e `/settings/team`
-6. **`src/shared/components/Sidebar.tsx`** — Ajustar paths se necessário (já apontam para as rotas corretas)
+**Mudança específica:**
+- Adicionar `<TableHead className="w-[100px]">Status</TableHead>` após Criticidade
+- Atualizar `colSpan` no estado vazio de 7 para 8
 
-### Lógica de membros
-- Membros ativos: count de `project_members` do projeto atual
-- Convites pendentes: count de `project_invites` com status `pending`
-- Convidar: insere em `project_invites` (email, nome, role)
-- Remover: deleta de `project_members` (somente owner/admin)
-- Cancelar convite: deleta de `project_invites`
-- Owner não pode ser removido, mostra label "OWNER" ao invés de botão Remover
-- Avatar: iniciais do nome com cores diferentes por index
+---
 
-### Sem migração SQL
-As tabelas `project_members` e `project_invites` já existem com as RLS policies corretas.
+## 2. Alterações na Linha da Tabela
+
+### `src/components/matriz/EvidenceTableRow.tsx`
+
+Adicionar nova célula exibindo o status com badge colorido:
+
+**Visual:**
+| Status | Cor do Badge |
+|--------|--------------|
+| Pendente | Cinza (bg-muted) |
+| Validado | Verde (bg-success/15) |
+| Rejeitado | Vermelho (bg-destructive/15) |
+| Investigar | Amarelo (bg-warning/15) |
+
+**Código da nova célula:**
+```typescript
+<TableCell className="w-[100px]">
+  <Badge 
+    variant="outline" 
+    className={cn('text-xs', STATUS_CONFIG[evidence.status].color)}
+  >
+    {STATUS_CONFIG[evidence.status].label}
+  </Badge>
+</TableCell>
+```
+
+---
+
+## 3. (Opcional) Filtro por Status
+
+### `src/components/matriz/TableFilters.tsx`
+
+Adicionar filtro de status aos filtros existentes:
+
+**Novo dropdown:**
+- "Todos os Status"
+- "Pendente"
+- "Validado"
+- "Rejeitado"
+- "Investigar"
+
+**Props adicionais:**
+```typescript
+selectedStatus: EvidenceStatus | 'all';
+onStatusChange: (status: EvidenceStatus | 'all') => void;
+```
+
+---
+
+## Seção Técnica
+
+### Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/matriz/EvidenceTable.tsx` | Adicionar coluna Status no header, atualizar colSpan |
+| `src/components/matriz/EvidenceTableRow.tsx` | Adicionar célula com badge de status |
+| `src/components/matriz/TableFilters.tsx` | Adicionar filtro por status (opcional) |
+
+### Estrutura Final da Tabela
+
+```
++------+----------+------------------+-----------+---------+------------+----------+-------+
+|  ID  |  Pilar   | Gap Identificado | Benchmark | Impacto | Criticidade|  Status  | Ações |
++------+----------+------------------+-----------+---------+------------+----------+-------+
+| G01  | Processos| Baixa aderência..| CRM com...| Receita |    Alta    | Pendente |  ...  |
+| G02  | Pessoas  | Falta de treina..| Onboarding| Eficiên.|   Média    | Validado |  ...  |
++------+----------+------------------+-----------+---------+------------+----------+-------+
+```
+
+### Importação Necessária
+
+Em `EvidenceTableRow.tsx`, importar `STATUS_CONFIG` de `@/lib/types`:
+```typescript
+import { PILARES, IMPACT_CONFIG, CRITICALITY_CONFIG, STATUS_CONFIG } from '@/lib/types';
+```
+
+### Dependências
+- Nenhuma nova dependência
+- Reutiliza o `STATUS_CONFIG` já existente em `src/lib/types.ts`
 

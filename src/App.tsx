@@ -14,6 +14,7 @@ import Plan from "./pages/Plan";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ProjetoSetupPage from "./features/projeto/components/ProjetoSetupPage";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +34,8 @@ const App = () => (
               <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
               <Route path="/plan" element={<ProtectedRoute><Plan /></ProtectedRoute>} />
               <Route path="/projeto/novo" element={<ProtectedRoute><ProjetoSetupPage /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
+              <Route path="/settings/pilares" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/settings/team" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Routes>
           </BrowserRouter>
         </ProjectProvider>
