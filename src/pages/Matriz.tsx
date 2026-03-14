@@ -6,7 +6,7 @@ import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { EvidenceTable } from '@/components/matriz/EvidenceTable';
 import { AddEvidenceDialog } from '@/components/matriz/AddEvidenceDialog';
 import { Button } from '@/components/ui/button';
-import { useProjectContext } from '@/contexts/ProjectContext';
+import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useEvidences, useUpdateEvidenceStatus } from '@/hooks/useProject';
 import { useConsolidateEvidences } from '@/hooks/useConsolidateEvidences';
 import type { EvidenceStatus } from '@/lib/types';

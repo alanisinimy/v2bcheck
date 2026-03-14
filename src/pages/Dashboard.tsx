@@ -6,7 +6,7 @@ import { MetricCard } from '@/components/dashboard/MetricCard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { ProjectOverviewForm } from '@/components/dashboard/ProjectOverviewForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useProjectContext } from '@/contexts/ProjectContext';
+import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useProjectStats, useEvidences } from '@/hooks/useProject';
 import type { Pilar } from '@/lib/types';
 import { PILARES } from '@/lib/types';
