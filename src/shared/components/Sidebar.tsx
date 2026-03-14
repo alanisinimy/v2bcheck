@@ -55,7 +55,7 @@ export function AppSidebar() {
       className="h-screen flex flex-col sticky top-0 bg-sidebar border-r border-sidebar-border shrink-0"
     >
       {/* Logo */}
-      <div className="px-4 py-4 border-b" style={{ borderColor: '#e8eaed' }}>
+      <div className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ backgroundColor: '#16a34a' }}>
             V2
