@@ -90,6 +90,8 @@ export async function analyzeEvidences({
       is_divergence: gap.is_divergence || false,
       divergence_description: gap.divergence_description || null,
       evidence_type: gap.is_divergence ? 'divergencia' as const : 'fato' as const,
+      confidence_score: gap.confidence_score ?? 1.0,
+      return_reason: gap.return_reason || null,
     }));
 
     const { error: insertError } = await supabase
