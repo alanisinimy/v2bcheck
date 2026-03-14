@@ -15,6 +15,7 @@ interface InitiativeTableProps {
   evidences: Evidence[];
   onUpdateStatus: (id: string, status: InitiativeStatus) => void;
   onDelete: (id: string) => void;
+  onPreview?: (id: string) => void;
   updatingId: string | null;
   deletingId: string | null;
 }
@@ -24,6 +25,7 @@ export function InitiativeTable({
   evidences,
   onUpdateStatus,
   onDelete,
+  onPreview,
   updatingId,
   deletingId,
 }: InitiativeTableProps) {
@@ -68,6 +70,7 @@ export function InitiativeTable({
                   evidenceMap={evidenceMap}
                   onUpdateStatus={onUpdateStatus}
                   onDelete={onDelete}
+                  onPreview={onPreview}
                   isUpdating={updatingId === initiative.id}
                   isDeleting={deletingId === initiative.id}
                 />

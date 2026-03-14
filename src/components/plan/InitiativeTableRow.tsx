@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreHorizontal, Check, Play, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Check, Play, Trash2, Loader2, Eye } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ interface InitiativeTableRowProps {
   evidenceMap: Map<string, Evidence>;
   onUpdateStatus: (id: string, status: InitiativeStatus) => void;
   onDelete: (id: string) => void;
+  onPreview?: (id: string) => void;
   isUpdating?: boolean;
   isDeleting?: boolean;
 }
@@ -52,6 +53,7 @@ export function InitiativeTableRow({
   evidenceMap,
   onUpdateStatus,
   onDelete,
+  onPreview,
   isUpdating = false,
   isDeleting = false,
 }: InitiativeTableRowProps) {
@@ -179,6 +181,15 @@ export function InitiativeTableRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                {onPreview && (
+                  <>
+                    <DropdownMenuItem onClick={() => onPreview(initiative.id)}>
+                      <Eye className="mr-2 h-4 w-4 text-primary" />
+                      Preview
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 {nextAction && (
                   <>
                     <DropdownMenuItem onClick={() => onUpdateStatus(initiative.id, nextAction.status)}>
