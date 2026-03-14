@@ -9,6 +9,9 @@ interface CreateProjectData {
   name: string;
   client_name: string;
   description?: string;
+  sector?: string;
+  company_size?: string;
+  custom_pilares?: { id: string; label: string; icon: string }[];
 }
 
 interface ProjectContextType {
