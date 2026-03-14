@@ -202,7 +202,8 @@ export async function analyzeTechnicalNote({
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
       body: { 
         content, 
-        sourceType: 'observacao_consultor' 
+        sourceType: 'observacao_consultor',
+        projectId,
       }
     });
 
