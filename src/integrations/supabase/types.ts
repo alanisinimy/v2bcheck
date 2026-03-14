@@ -270,6 +270,53 @@ export type Database = {
           },
         ]
       }
+      export_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          file_url: string | null
+          formato: string
+          id: string
+          project_id: string
+          status: string
+          tipo: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_url?: string | null
+          formato?: string
+          id?: string
+          project_id: string
+          status?: string
+          tipo: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_url?: string | null
+          formato?: string
+          id?: string
+          project_id?: string
+          status?: string
+          tipo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       initiatives: {
         Row: {
           created_at: string
@@ -534,6 +581,50 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "project_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quick_notes: {
+        Row: {
+          content_type: string
+          created_at: string | null
+          id: string
+          pilar_sugerido: string | null
+          processed_content: string | null
+          project_id: string
+          raw_content: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          pilar_sugerido?: string | null
+          processed_content?: string | null
+          project_id: string
+          raw_content: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          pilar_sugerido?: string | null
+          processed_content?: string | null
+          project_id?: string
+          raw_content?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
