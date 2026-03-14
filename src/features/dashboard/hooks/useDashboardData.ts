@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useAssets, useEvidences } from '@/hooks/useProject';
 import { useCollaborators, useTeamDistribution } from '@/hooks/useCollaborators';
 import { useInitiatives } from '@/hooks/useInitiatives';
+import { useActivityLog } from '@/features/dashboard/hooks/useActivityLog';
 import type { Pilar } from '@/shared/types/project';
-import type { Evidence } from '@/shared/types/gap';
 
 const ALL_PILARES: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
 
@@ -12,6 +12,7 @@ export function useDashboardData(projectId: string | undefined) {
   const { data: evidences = [], isLoading: loadingEvidences } = useEvidences(projectId);
   const { data: collaborators = [], isLoading: loadingCollaborators } = useCollaborators(projectId);
   const { data: initiatives = [], isLoading: loadingInitiatives } = useInitiatives(projectId);
+  const { data: activityLog = [], isLoading: loadingActivity } = useActivityLog(projectId);
   const teamDistribution = useTeamDistribution(collaborators);
 
   const stats = useMemo(() => {
@@ -80,30 +81,8 @@ export function useDashboardData(projectId: string | undefined) {
     return { steps, doneCount, currentIndex, pct };
   }, [assets, evidences, initiatives]);
 
-  // Activity feed — derive from real timestamps
-  const activityFeed = useMemo(() => {
-    const items: { type: 'upload' | 'ai' | 'validation' | 'alert'; text: string; time: Date }[] = [];
-
-    assets.forEach(a => {
-      items.push({ type: 'upload', text: `Arquivo "${a.file_name}" enviado ao Vault`, time: new Date(a.created_at) });
-    });
-
-    evidences.forEach(e => {
-      if (e.status === 'validado') {
-        items.push({ type: 'validation', text: `Gap "${e.content.slice(0, 50)}..." validado`, time: new Date(e.updated_at) });
-      } else if (e.is_divergence) {
-        items.push({ type: 'alert', text: `Divergência detectada: ${e.content.slice(0, 50)}...`, time: new Date(e.created_at) });
-      } else {
-        items.push({ type: 'ai', text: `Gap identificado: "${e.content.slice(0, 50)}..."`, time: new Date(e.created_at) });
-      }
-    });
-
-    initiatives.forEach(i => {
-      items.push({ type: 'ai', text: `Iniciativa "${i.title}" gerada no plano`, time: new Date(i.created_at) });
-    });
-
-    return items.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 8);
-  }, [assets, evidences, initiatives]);
+  // Activity feed from activity_log table
+  const activityFeed = activityLog;
 
   // Dominant DISC style
   const dominantStyle = useMemo(() => {
@@ -125,7 +104,7 @@ export function useDashboardData(projectId: string | undefined) {
     return { message: 'Diagnóstico completo! Exporte os entregáveis', cta: 'Exportar →', href: '/plan' };
   }, [assets, evidences, stats.pendentes, initiatives]);
 
-  const isLoading = loadingAssets || loadingEvidences || loadingCollaborators || loadingInitiatives;
+  const isLoading = loadingAssets || loadingEvidences || loadingCollaborators || loadingInitiatives || loadingActivity;
 
   return {
     stats,
