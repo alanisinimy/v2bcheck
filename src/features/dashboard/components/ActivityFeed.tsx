@@ -1,17 +1,25 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/shared/lib/utils';
-
-interface Activity {
-  type: 'upload' | 'ai' | 'validation' | 'alert';
-  text: string;
-  time: Date;
-}
+import type { ActivityLogEntry } from '@/features/dashboard/hooks/useActivityLog';
 
 interface ActivityFeedProps {
-  items: Activity[];
+  items: ActivityLogEntry[];
 }
 
-const dotColors: Record<Activity['type'], string> = {
+const ACTION_TYPE_MAP: Record<string, string> = {
+  upload: 'upload',
+  gap_gerado: 'ai',
+  gap_validado: 'validation',
+  gap_rejeitado: 'validation',
+  gap_atualizado: 'ai',
+  sintese_gerada: 'ai',
+  plano_gerado: 'ai',
+  disc_processado: 'ai',
+  evidencia_consolidada: 'ai',
+  processamento: 'ai',
+};
+
+const dotColors: Record<string, string> = {
   upload: 'bg-primary',
   ai: 'bg-secondary-foreground',
   validation: 'bg-success',
@@ -49,15 +57,25 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
         <p className="text-sm text-muted-foreground text-center py-6">Nenhuma atividade registrada.</p>
       ) : (
         <div className="space-y-3">
-          {items.map((item, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className={cn('w-2 h-2 rounded-full mt-2 flex-shrink-0', dotColors[item.type])} />
-              <p className="text-sm text-foreground flex-1 line-clamp-1">{item.text}</p>
-              <span className="text-[11px] text-muted-foreground flex-shrink-0 font-mono tabular-nums">
-                {formatRelativeTime(item.time)}
-              </span>
-            </div>
-          ))}
+          {items.map((item) => {
+            const type = ACTION_TYPE_MAP[item.action] || 'ai';
+            const time = new Date(item.created_at);
+            const actorPrefix = item.actor_name && item.actor_type === 'consultor'
+              ? `${item.actor_name} `
+              : item.actor_type === 'ia' ? 'IA ' : '';
+
+            return (
+              <div key={item.id} className="flex items-start gap-3">
+                <div className={cn('w-2 h-2 rounded-full mt-2 flex-shrink-0', dotColors[type] || dotColors.ai)} />
+                <p className="text-sm text-foreground flex-1 line-clamp-1">
+                  {actorPrefix}{item.description}
+                </p>
+                <span className="text-[11px] text-muted-foreground flex-shrink-0 font-mono tabular-nums">
+                  {formatRelativeTime(time)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </motion.div>

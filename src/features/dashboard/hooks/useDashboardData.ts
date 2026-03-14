@@ -104,7 +104,7 @@ export function useDashboardData(projectId: string | undefined) {
     return { message: 'Diagnóstico completo! Exporte os entregáveis', cta: 'Exportar →', href: '/plan' };
   }, [assets, evidences, stats.pendentes, initiatives]);
 
-  const isLoading = loadingAssets || loadingEvidences || loadingCollaborators || loadingInitiatives;
+  const isLoading = loadingAssets || loadingEvidences || loadingCollaborators || loadingInitiatives || loadingActivity;
 
   return {
     stats,
