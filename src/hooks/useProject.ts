@@ -13,7 +13,7 @@ export function useProjects() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as Project[];
+      return data as unknown as Project[];
     },
   });
 }
