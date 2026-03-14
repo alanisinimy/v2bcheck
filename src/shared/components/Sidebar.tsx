@@ -266,20 +266,23 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors active-scale"
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-              <span className="text-xs font-medium">Recolher</span>
-            </>
-          )}
-        </button>
+        {/* Theme + Collapse */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleTheme}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors active-scale"
+            title={theme === 'light' ? 'Modo escuro' : 'Modo claro'}
+          >
+            {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            {!collapsed && <span className="text-xs font-medium">{theme === 'light' ? 'Escuro' : 'Claro'}</span>}
+          </button>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors active-scale"
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
     </motion.aside>
   );
