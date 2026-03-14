@@ -1,12 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckSquare, X, Trash2, Loader2, FileText } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
+import { PageHeader } from '@/shared/components/PageHeader';
 import { FileUploadZone } from '@/components/vault/FileUploadZone';
 import { AssetCard } from '@/components/vault/AssetCard';
 import { SourceTypeModal } from '@/components/vault/SourceTypeModal';
 import { TechnicalNoteModal } from '@/components/vault/TechnicalNoteModal';
+import { ProcessingProgress, type ProcessingFileItem } from '@/features/vault/components/ProcessingProgress';
+import { VaultFilters } from '@/features/vault/components/VaultFilters';
+import { AssetDetailDrawer } from '@/features/vault/components/AssetDetailDrawer';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -20,12 +24,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
-import { useAssets, useDeleteAsset } from '@/hooks/useProject';
+import { useAssets, useEvidences, useDeleteAsset } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
 import { analyzeEvidences, extractTextFromFile, analyzeTechnicalNote } from '@/hooks/useAnalyzeEvidences';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import type { SourceType } from '@/lib/types';
+import type { SourceType, Asset } from '@/lib/types';
+import type { Pilar } from '@/shared/types/project';
 
 interface PendingFile {
   file: File;
@@ -36,20 +41,23 @@ interface PendingFile {
 export default function Vault() {
   const { currentProject, isLoading: isLoadingProject } = useProjectContext();
   const { data: assets = [], isLoading: isLoadingAssets } = useAssets(currentProject?.id);
+  const { data: evidences = [] } = useEvidences(currentProject?.id);
   const uploadAssetMutation = useUploadAsset();
   const updateStatusMutation = useUpdateAssetStatus();
   const deleteAssetMutation = useDeleteAsset();
   const queryClient = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
-  const [processingMessage, setProcessingMessage] = useState<string | null>(null);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
-  
+
+  // Processing progress state
+  const [processingFiles, setProcessingFiles] = useState<ProcessingFileItem[]>([]);
+
   // Selection mode state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-  
+
   // Classification modal state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
@@ -60,17 +68,53 @@ export default function Vault() {
   const [isTechnicalNoteOpen, setIsTechnicalNoteOpen] = useState(false);
   const [isProcessingNote, setIsProcessingNote] = useState(false);
 
+  // Filters
+  const [sourceTypeFilter, setSourceTypeFilter] = useState<SourceType | 'all'>('all');
+  const [pilarFilter, setPilarFilter] = useState<Pilar | 'all'>('all');
+
+  // Asset detail drawer
+  const [detailAsset, setDetailAsset] = useState<Asset | null>(null);
+
+  // Filter assets
+  const filteredAssets = useMemo(() => {
+    let result = assets;
+    if (sourceTypeFilter !== 'all') {
+      result = result.filter(a => a.source_type === sourceTypeFilter);
+    }
+    if (pilarFilter !== 'all') {
+      // Filter by assets that have evidences in the selected pilar
+      const assetIdsWithPilar = new Set(
+        evidences.filter(e => e.pilar === pilarFilter).map(e => e.asset_id)
+      );
+      result = result.filter(a => assetIdsWithPilar.has(a.id));
+    }
+    return result;
+  }, [assets, evidences, sourceTypeFilter, pilarFilter]);
+
+  const updateFileStatus = useCallback((fileId: string, status: ProcessingFileItem['status']) => {
+    setProcessingFiles(prev => prev.map(f => f.id === fileId ? { ...f, status } : f));
+  }, []);
+
   const processFiles = useCallback(async (files: PendingFile[]) => {
     if (!currentProject) return;
-    
+
+    // Initialize processing progress
+    const items: ProcessingFileItem[] = files.map((f, i) => ({
+      id: `file-${Date.now()}-${i}`,
+      fileName: f.file.name,
+      status: 'queued' as const,
+    }));
+    setProcessingFiles(items);
     setIsUploading(true);
-    
-    for (const { file, sourceType, collaboratorId } of files) {
+
+    for (let i = 0; i < files.length; i++) {
+      const { file, sourceType, collaboratorId } = files[i];
+      const fileId = items[i].id;
       if (!sourceType) continue;
-      
+
       try {
-        // Step 1: Upload file to storage and create asset record
-        setProcessingMessage(`Enviando ${file.name}...`);
+        // Step 1: Upload
+        updateFileStatus(fileId, 'extracting');
         const asset = await uploadAssetMutation.mutateAsync({
           projectId: currentProject.id,
           file,
@@ -78,19 +122,13 @@ export default function Vault() {
           collaboratorId: collaboratorId || undefined,
         });
 
-        toast({
-          title: 'Upload concluído',
-          description: `${file.name} foi enviado com sucesso.`,
-        });
-
-        // Step 2: Extract text from file
-        setProcessingMessage(`Extraindo texto de ${file.name}...`);
+        // Step 2: Extract text
         const textContent = await extractTextFromFile(file);
 
         if (textContent) {
-          // Step 3: Analyze with AI (pass collaborator context if available)
-          setProcessingMessage(`Analisando ${file.name} com IA...`);
-          
+          // Step 3: Classify
+          updateFileStatus(fileId, 'classifying');
+
           const result = await analyzeEvidences({
             projectId: currentProject.id,
             assetId: asset.id,
@@ -101,33 +139,25 @@ export default function Vault() {
           });
 
           if (result.error) {
-            // Update asset status to error
             await updateStatusMutation.mutateAsync({
               assetId: asset.id,
               status: 'error',
               projectId: currentProject.id,
             });
-
-            toast({
-              title: 'Erro na análise',
-              description: result.error,
-              variant: 'destructive',
-            });
+            updateFileStatus(fileId, 'error');
+            toast({ title: 'Erro na análise', description: result.error, variant: 'destructive' });
           } else {
-            // Step 4: Update asset status to completed
+            // Step 4: Index
+            updateFileStatus(fileId, 'indexing');
             await updateStatusMutation.mutateAsync({
               assetId: asset.id,
               status: 'completed',
               projectId: currentProject.id,
             });
-
-            // Invalidate evidences query to refresh Matriz
             queryClient.invalidateQueries({ queryKey: ['evidences', currentProject.id] });
-            
-            // If it's a DISC profile, also invalidate collaborators
+
             if (sourceType === 'perfil_disc') {
               queryClient.invalidateQueries({ queryKey: ['collaborators', currentProject.id] });
-              
               if (result.collaborator) {
                 toast({
                   title: result.isNewCollaborator ? 'Colaborador cadastrado' : 'Perfil atualizado',
@@ -135,44 +165,33 @@ export default function Vault() {
                 });
               }
             } else {
-              toast({
-                title: 'IA processou o arquivo',
-                description: `${result.count} gaps extraídos de ${file.name}.`,
-              });
+              toast({ title: 'IA processou o arquivo', description: `${result.count} gaps extraídos de ${file.name}.` });
             }
+            updateFileStatus(fileId, 'done');
           }
         } else {
-          // File type not supported for text extraction
           await updateStatusMutation.mutateAsync({
             assetId: asset.id,
             status: 'completed',
             projectId: currentProject.id,
           });
-
-          toast({
-            title: 'Arquivo processado',
-            description: `${file.name} foi salvo (tipo não suportado para extração de texto).`,
-          });
+          updateFileStatus(fileId, 'done');
+          toast({ title: 'Arquivo processado', description: `${file.name} foi salvo.` });
         }
-
       } catch (error) {
         console.error('Upload error:', error);
-        toast({
-          title: 'Erro no upload',
-          description: `Não foi possível processar ${file.name}.`,
-          variant: 'destructive',
-        });
+        updateFileStatus(fileId, 'error');
+        toast({ title: 'Erro no upload', description: `Não foi possível processar ${file.name}.`, variant: 'destructive' });
       }
     }
-    
+
     setIsUploading(false);
-    setProcessingMessage(null);
-  }, [currentProject, uploadAssetMutation, updateStatusMutation, queryClient]);
+    // Clear processing files after a delay
+    setTimeout(() => setProcessingFiles([]), 3000);
+  }, [currentProject, uploadAssetMutation, updateStatusMutation, queryClient, updateFileStatus]);
 
   const handleFilesSelected = useCallback((files: File[]) => {
     if (files.length === 0) return;
-    
-    // Start classification flow
     setPendingFiles(files);
     setCurrentFileIndex(0);
     setClassifiedFiles([]);
@@ -182,13 +201,11 @@ export default function Vault() {
   const handleSourceTypeConfirm = useCallback((sourceType: SourceType, collaboratorId: string | null) => {
     const currentFile = pendingFiles[currentFileIndex];
     const newClassified = [...classifiedFiles, { file: currentFile, sourceType, collaboratorId }];
-    
+
     if (currentFileIndex < pendingFiles.length - 1) {
-      // More files to classify
       setClassifiedFiles(newClassified);
       setCurrentFileIndex(currentFileIndex + 1);
     } else {
-      // All files classified, start processing
       setIsModalOpen(false);
       setPendingFiles([]);
       setCurrentFileIndex(0);
@@ -204,44 +221,22 @@ export default function Vault() {
     setClassifiedFiles([]);
   }, []);
 
-  // Technical Note handler
   const handleTechnicalNoteSubmit = useCallback(async (title: string, content: string) => {
     if (!currentProject) return;
-    
     setIsProcessingNote(true);
-    
     try {
-      const result = await analyzeTechnicalNote({
-        projectId: currentProject.id,
-        title,
-        content,
-      });
-
+      const result = await analyzeTechnicalNote({ projectId: currentProject.id, title, content });
       if (result.error) {
-        toast({
-          title: 'Erro na análise',
-          description: result.error,
-          variant: 'destructive',
-        });
+        toast({ title: 'Erro na análise', description: result.error, variant: 'destructive' });
       } else {
-        // Refresh assets and evidences
         queryClient.invalidateQueries({ queryKey: ['assets', currentProject.id] });
         queryClient.invalidateQueries({ queryKey: ['evidences', currentProject.id] });
-        
-        toast({
-          title: 'Nota técnica processada',
-          description: `${result.count} gaps estratégicos extraídos.`,
-        });
-        
+        toast({ title: 'Nota técnica processada', description: `${result.count} gaps estratégicos extraídos.` });
         setIsTechnicalNoteOpen(false);
       }
     } catch (error) {
       console.error('Technical note error:', error);
-      toast({
-        title: 'Erro ao processar nota',
-        description: 'Não foi possível processar a nota técnica.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro ao processar nota', description: 'Não foi possível processar a nota técnica.', variant: 'destructive' });
     } finally {
       setIsProcessingNote(false);
     }
@@ -249,27 +244,13 @@ export default function Vault() {
 
   const handleDeleteAsset = useCallback(async (assetId: string, storagePath: string) => {
     if (!currentProject) return;
-    
     setDeletingAssetId(assetId);
-    
     try {
-      await deleteAssetMutation.mutateAsync({
-        assetId,
-        storagePath,
-        projectId: currentProject.id,
-      });
-      
-      toast({
-        title: 'Arquivo excluído',
-        description: 'O arquivo e suas evidências foram removidos.',
-      });
+      await deleteAssetMutation.mutateAsync({ assetId, storagePath, projectId: currentProject.id });
+      toast({ title: 'Arquivo excluído', description: 'O arquivo e suas evidências foram removidos.' });
     } catch (error) {
       console.error('Delete error:', error);
-      toast({
-        title: 'Erro ao excluir',
-        description: 'Não foi possível excluir o arquivo.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro ao excluir', description: 'Não foi possível excluir o arquivo.', variant: 'destructive' });
     } finally {
       setDeletingAssetId(null);
     }
@@ -284,71 +265,47 @@ export default function Vault() {
   const handleSelectionChange = useCallback((assetId: string, selected: boolean) => {
     setSelectedAssets(prev => {
       const next = new Set(prev);
-      if (selected) {
-        next.add(assetId);
-      } else {
-        next.delete(assetId);
-      }
+      if (selected) next.add(assetId); else next.delete(assetId);
       return next;
     });
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    if (selectedAssets.size === assets.length) {
+    if (selectedAssets.size === filteredAssets.length) {
       setSelectedAssets(new Set());
     } else {
-      setSelectedAssets(new Set(assets.map(a => a.id)));
+      setSelectedAssets(new Set(filteredAssets.map(a => a.id)));
     }
-  }, [assets, selectedAssets.size]);
+  }, [filteredAssets, selectedAssets.size]);
 
   const handleBulkDelete = useCallback(async () => {
     if (!currentProject || selectedAssets.size === 0) return;
-    
     setIsBulkDeleting(true);
     setShowBulkDeleteDialog(false);
-    
     const assetsToDelete = assets.filter(a => selectedAssets.has(a.id));
     let deletedCount = 0;
     let errorCount = 0;
-    
     for (const asset of assetsToDelete) {
       try {
-        await deleteAssetMutation.mutateAsync({
-          assetId: asset.id,
-          storagePath: asset.storage_path,
-          projectId: currentProject.id,
-        });
+        await deleteAssetMutation.mutateAsync({ assetId: asset.id, storagePath: asset.storage_path, projectId: currentProject.id });
         deletedCount++;
-      } catch (error) {
-        console.error('Delete error for asset:', asset.id, error);
-        errorCount++;
-      }
+      } catch { errorCount++; }
     }
-    
     setIsBulkDeleting(false);
     setSelectedAssets(new Set());
     setIsSelectionMode(false);
-    
-    if (errorCount === 0) {
-      toast({
-        title: 'Arquivos excluídos',
-        description: `${deletedCount} arquivo(s) e suas evidências foram removidos.`,
-      });
-    } else {
-      toast({
-        title: 'Exclusão parcial',
-        description: `${deletedCount} excluído(s), ${errorCount} erro(s).`,
-        variant: 'destructive',
-      });
-    }
+    toast({
+      title: errorCount === 0 ? 'Arquivos excluídos' : 'Exclusão parcial',
+      description: errorCount === 0 ? `${deletedCount} arquivo(s) removidos.` : `${deletedCount} excluído(s), ${errorCount} erro(s).`,
+      variant: errorCount > 0 ? 'destructive' : undefined,
+    });
   }, [currentProject, selectedAssets, assets, deleteAssetMutation]);
 
   const isLoading = isLoadingProject || isLoadingAssets;
   const currentFileName = pendingFiles[currentFileIndex]?.name || '';
-  const allSelected = assets.length > 0 && selectedAssets.size === assets.length;
-  const someSelected = selectedAssets.size > 0 && selectedAssets.size < assets.length;
+  const allSelected = filteredAssets.length > 0 && selectedAssets.size === filteredAssets.length;
+  const someSelected = selectedAssets.size > 0 && selectedAssets.size < filteredAssets.length;
 
-  // Show loading state
   if (isLoading) {
     return (
       <AppLayout>
@@ -359,7 +316,6 @@ export default function Vault() {
     );
   }
 
-  // Show empty state if no project selected
   if (!currentProject) {
     return (
       <AppLayout>
@@ -370,37 +326,21 @@ export default function Vault() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="p-8 max-w-5xl mx-auto space-y-6">
         {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-          className="mb-8"
-        >
-          <h1 className="text-3xl font-bold text-foreground mb-2">The Vault</h1>
-          <p className="text-muted-foreground">
-            Central de ingestão de dados. Faça upload de reuniões, documentos e planilhas.
-          </p>
-        </motion.header>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsTechnicalNoteOpen(true)}
-            className="gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            Adicionar Nota Técnica
-          </Button>
-        </div>
+        <PageHeader
+          title="The Vault"
+          description="Central de ingestão de dados. Faça upload de reuniões, documentos e planilhas."
+          actions={
+            <Button variant="outline" onClick={() => setIsTechnicalNoteOpen(true)} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Adicionar Nota Técnica
+            </Button>
+          }
+        />
 
         {/* Upload Zone */}
-        <FileUploadZone 
-          onFilesSelected={handleFilesSelected}
-          isUploading={isUploading}
-        />
+        <FileUploadZone onFilesSelected={handleFilesSelected} isUploading={isUploading} />
 
         {/* Source Type Classification Modal */}
         <SourceTypeModal
@@ -419,58 +359,47 @@ export default function Vault() {
           isProcessing={isProcessingNote}
         />
 
-        {/* Processing Message */}
-        {processingMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-foreground">{processingMessage}</span>
-            </div>
-          </motion.div>
-        )}
+        {/* 4.1 Processing Progress */}
+        <AnimatePresence>
+          {processingFiles.length > 0 && (
+            <ProcessingProgress files={processingFiles} />
+          )}
+        </AnimatePresence>
 
-        {/* Assets List */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mt-8"
-        >
-          {/* Section Header with Selection Toggle */}
+        {/* Assets Section */}
+        <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          {/* Section Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-foreground">
               Arquivos Processados ({assets.length})
             </h2>
-            
             {assets.length > 0 && (
               <Button
-                variant={isSelectionMode ? "secondary" : "outline"}
+                variant={isSelectionMode ? 'secondary' : 'outline'}
                 size="sm"
                 onClick={toggleSelectionMode}
                 className="gap-2"
               >
-                {isSelectionMode ? (
-                  <>
-                    <X className="w-4 h-4" />
-                    Cancelar
-                  </>
-                ) : (
-                  <>
-                    <CheckSquare className="w-4 h-4" />
-                    Selecionar
-                  </>
-                )}
+                {isSelectionMode ? <><X className="w-4 h-4" /> Cancelar</> : <><CheckSquare className="w-4 h-4" /> Selecionar</>}
               </Button>
             )}
           </div>
 
+          {/* 4.2 Filters */}
+          {assets.length > 0 && (
+            <div className="mb-4">
+              <VaultFilters
+                sourceTypeFilter={sourceTypeFilter}
+                pilarFilter={pilarFilter}
+                onSourceTypeChange={setSourceTypeFilter}
+                onPilarChange={setPilarFilter}
+              />
+            </div>
+          )}
+
           {/* Bulk Actions Bar */}
           <AnimatePresence>
-            {isSelectionMode && assets.length > 0 && (
+            {isSelectionMode && filteredAssets.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -479,22 +408,13 @@ export default function Vault() {
               >
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg border">
                   <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) {
-                          (el as any).indeterminate = someSelected;
-                        }
-                      }}
-                      onCheckedChange={handleSelectAll}
-                    />
+                    <Checkbox checked={allSelected} onCheckedChange={handleSelectAll} />
                     <span className="text-sm text-muted-foreground">
-                      {selectedAssets.size === 0 
-                        ? 'Nenhum selecionado' 
-                        : `${selectedAssets.size} de ${assets.length} selecionado(s)`}
+                      {selectedAssets.size === 0
+                        ? 'Nenhum selecionado'
+                        : `${selectedAssets.size} de ${filteredAssets.length} selecionado(s)`}
                     </span>
                   </div>
-                  
                   <Button
                     variant="destructive"
                     size="sm"
@@ -502,37 +422,39 @@ export default function Vault() {
                     onClick={() => setShowBulkDeleteDialog(true)}
                     className="gap-2"
                   >
-                    {isBulkDeleting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Excluindo...
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-4 h-4" />
-                        Excluir ({selectedAssets.size})
-                      </>
-                    )}
+                    {isBulkDeleting ? <><Loader2 className="w-4 h-4 animate-spin" /> Excluindo...</> : <><Trash2 className="w-4 h-4" /> Excluir ({selectedAssets.size})</>}
                   </Button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-          
+
+          {/* Asset List */}
           <div className="space-y-3">
-            {assets.map((asset, index) => (
-              <AssetCard 
-                key={asset.id} 
-                asset={asset} 
-                index={index}
-                onDelete={handleDeleteAsset}
-                isDeleting={deletingAssetId === asset.id}
-                isSelectionMode={isSelectionMode}
-                isSelected={selectedAssets.has(asset.id)}
-                onSelectionChange={handleSelectionChange}
-              />
+            {filteredAssets.map((asset, index) => (
+              <div
+                key={asset.id}
+                onClick={() => !isSelectionMode && setDetailAsset(asset)}
+                className={!isSelectionMode ? 'cursor-pointer' : undefined}
+              >
+                <AssetCard
+                  asset={asset}
+                  index={index}
+                  onDelete={handleDeleteAsset}
+                  isDeleting={deletingAssetId === asset.id}
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedAssets.has(asset.id)}
+                  onSelectionChange={handleSelectionChange}
+                />
+              </div>
             ))}
           </div>
+
+          {filteredAssets.length === 0 && assets.length > 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Nenhum arquivo corresponde aos filtros selecionados.</p>
+            </div>
+          )}
 
           {assets.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
@@ -541,13 +463,21 @@ export default function Vault() {
           )}
         </motion.section>
 
-        {/* Bulk Delete Confirmation Dialog */}
+        {/* Asset Detail Drawer */}
+        <AssetDetailDrawer
+          asset={detailAsset}
+          evidences={evidences}
+          open={!!detailAsset}
+          onClose={() => setDetailAsset(null)}
+        />
+
+        {/* Bulk Delete Confirmation */}
         <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir {selectedAssets.size} arquivo(s)?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta ação não pode ser desfeita. Todos os arquivos selecionados e suas evidências associadas serão permanentemente excluídos.
+                Esta ação não pode ser desfeita. Todos os arquivos selecionados e suas evidências serão permanentemente excluídos.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
