@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
 import { Button } from '@/components/ui/button';
 import { InitiativeTable } from '@/components/plan/InitiativeTable';
-import { useProjectContext } from '@/contexts/ProjectContext';
+import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useProjectStats, useEvidences } from '@/hooks/useProject';
 import { useCollaborators, useTeamDistribution } from '@/hooks/useCollaborators';
 import {

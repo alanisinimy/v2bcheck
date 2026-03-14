@@ -9,7 +9,7 @@ import { AddCollaboratorDialog } from '@/components/team/AddCollaboratorDialog';
 import { PeopleDataUploadZone } from '@/components/team/PeopleDataUploadZone';
 import { PeopleDataBatchModal, type ClassifiedFile } from '@/components/team/PeopleDataBatchModal';
 import { TeamDistributionChart } from '@/components/team/DiscProfileBars';
-import { useProjectContext } from '@/contexts/ProjectContext';
+import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import {
   useCollaborators,
   useCreateCollaborator,

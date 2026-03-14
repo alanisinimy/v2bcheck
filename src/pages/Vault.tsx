@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useProjectContext } from '@/contexts/ProjectContext';
+import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useAssets, useDeleteAsset } from '@/hooks/useProject';
 import { useUploadAsset, useUpdateAssetStatus } from '@/hooks/useUploadAsset';
 import { analyzeEvidences, extractTextFromFile, analyzeTechnicalNote } from '@/hooks/useAnalyzeEvidences';
