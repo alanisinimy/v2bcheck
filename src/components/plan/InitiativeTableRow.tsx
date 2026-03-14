@@ -181,6 +181,15 @@ export function InitiativeTableRow({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                {onPreview && (
+                  <>
+                    <DropdownMenuItem onClick={() => onPreview(initiative.id)}>
+                      <Eye className="mr-2 h-4 w-4 text-primary" />
+                      Preview
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 {nextAction && (
                   <>
                     <DropdownMenuItem onClick={() => onUpdateStatus(initiative.id, nextAction.status)}>
