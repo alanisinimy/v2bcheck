@@ -1,112 +1,110 @@
 
 
-# Plano: Adicionar Coluna de Status na Matriz de Gaps
+## Plano: Fase 3 — Export, Quick Notes & Project State
 
-## Objetivo
-Exibir o status de cada evidência/gap diretamente na tabela da Matriz, permitindo visualização rápida do estado de validação sem precisar abrir o menu de ações.
+### Escopo
 
----
-
-## 1. Alterações no Componente da Tabela
-
-### `src/components/matriz/EvidenceTable.tsx`
-
-Adicionar nova coluna "Status" no cabeçalho:
-
-**Antes:**
-```
-ID | Pilar | Gap Identificado | Benchmark | Impacto | Criticidade | Ações
-```
-
-**Depois:**
-```
-ID | Pilar | Gap Identificado | Benchmark | Impacto | Criticidade | Status | Ações
-```
-
-**Mudança específica:**
-- Adicionar `<TableHead className="w-[100px]">Status</TableHead>` após Criticidade
-- Atualizar `colSpan` no estado vazio de 7 para 8
+- 2 tabelas novas: `quick_notes`, `export_jobs`
+- 1 storage bucket: `exports`
+- 3 edge functions novas: `generate-export`, `process-quick-note`, `calculate-project-state`
+- Frontend: integrar ExportPanel com a edge function real + hooks
 
 ---
 
-## 2. Alterações na Linha da Tabela
+### 1. SQL Migration
 
-### `src/components/matriz/EvidenceTableRow.tsx`
-
-Adicionar nova célula exibindo o status com badge colorido:
-
-**Visual:**
-| Status | Cor do Badge |
-|--------|--------------|
-| Pendente | Cinza (bg-muted) |
-| Validado | Verde (bg-success/15) |
-| Rejeitado | Vermelho (bg-destructive/15) |
-| Investigar | Amarelo (bg-warning/15) |
-
-**Código da nova célula:**
-```typescript
-<TableCell className="w-[100px]">
-  <Badge 
-    variant="outline" 
-    className={cn('text-xs', STATUS_CONFIG[evidence.status].color)}
-  >
-    {STATUS_CONFIG[evidence.status].label}
-  </Badge>
-</TableCell>
+**Tabela `quick_notes`:**
+```sql
+create table quick_notes (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  user_id uuid not null,
+  content_type text not null default 'texto',
+  raw_content text not null,
+  processed_content text,
+  pilar_sugerido text,
+  status text not null default 'pendente',
+  created_at timestamptz default now()
+);
 ```
+
+**Tabela `export_jobs`:**
+```sql
+create table export_jobs (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  user_id uuid not null,
+  tipo text not null,
+  formato text not null default 'pdf',
+  status text not null default 'pendente',
+  file_url text,
+  error_message text,
+  created_at timestamptz default now(),
+  completed_at timestamptz
+);
+```
+
+**RLS** on both using `is_project_member(auth.uid(), project_id)` for SELECT/INSERT/UPDATE.
+
+**Storage bucket** `exports` (private) — RLS policy for project members using path pattern `{project_id}/`.
 
 ---
 
-## 3. (Opcional) Filtro por Status
+### 2. Edge Function: `calculate-project-state`
 
-### `src/components/matriz/TableFilters.tsx`
+No AI. Deterministic logic. Queries assets, evidences, initiatives, collaborators, processing_queue for a project. Returns:
+- `current_phase`, `stepper` (5 steps with done/detail), `stats` (files, gaps, team), `cobertura` per pilar, `next_step` (action/label/route), `processing` queue status.
 
-Adicionar filtro de status aos filtros existentes:
-
-**Novo dropdown:**
-- "Todos os Status"
-- "Pendente"
-- "Validado"
-- "Rejeitado"
-- "Investigar"
-
-**Props adicionais:**
-```typescript
-selectedStatus: EvidenceStatus | 'all';
-onStatusChange: (status: EvidenceStatus | 'all') => void;
-```
+Essentially moves `useDashboardData` computation server-side, but both can coexist. The frontend hook can optionally call this function instead of computing locally.
 
 ---
 
-## Seção Técnica
+### 3. Edge Function: `generate-export`
 
-### Arquivos a Modificar
+Receives `{ project_id, tipo, formato }`. Flow:
+1. Create `export_jobs` row with status `gerando`
+2. Fetch project data (gaps, initiatives, pilares_config, context)
+3. For `sintese`: call Lovable AI Gateway (`google/gemini-2.5-pro`) to generate executive narrative
+4. For `matriz`/`plano`: structure data as formatted text/markdown
+5. Generate file content (for MVP: markdown/text — PDF generation would need a library)
+6. Upload to `exports` bucket
+7. Update `export_jobs` with `file_url` and status `concluido`
+8. Log in `activity_log`
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/matriz/EvidenceTable.tsx` | Adicionar coluna Status no header, atualizar colSpan |
-| `src/components/matriz/EvidenceTableRow.tsx` | Adicionar célula com badge de status |
-| `src/components/matriz/TableFilters.tsx` | Adicionar filtro por status (opcional) |
+Note: True PDF/PPTX generation requires external libraries not available in Deno edge functions. For MVP, generate structured markdown/text files. The frontend can render these or we can note this limitation.
 
-### Estrutura Final da Tabela
+---
 
-```
-+------+----------+------------------+-----------+---------+------------+----------+-------+
-|  ID  |  Pilar   | Gap Identificado | Benchmark | Impacto | Criticidade|  Status  | Ações |
-+------+----------+------------------+-----------+---------+------------+----------+-------+
-| G01  | Processos| Baixa aderência..| CRM com...| Receita |    Alta    | Pendente |  ...  |
-| G02  | Pessoas  | Falta de treina..| Onboarding| Eficiên.|   Média    | Validado |  ...  |
-+------+----------+------------------+-----------+---------+------------+----------+-------+
-```
+### 4. Edge Function: `process-quick-note`
 
-### Importação Necessária
+Receives `{ note_id, project_id }`. Flow:
+1. Fetch note from `quick_notes`
+2. Call Lovable AI Gateway (`google/gemini-2.5-flash`) to structure the note and suggest pilar
+3. Update `quick_notes` with `processed_content`, `pilar_sugerido`, status `processado`
+4. Log in `activity_log`
 
-Em `EvidenceTableRow.tsx`, importar `STATUS_CONFIG` de `@/lib/types`:
-```typescript
-import { PILARES, IMPACT_CONFIG, CRITICALITY_CONFIG, STATUS_CONFIG } from '@/lib/types';
-```
+---
 
-### Dependências
-- Nenhuma nova dependência
-- Reutiliza o `STATUS_CONFIG` já existente em `src/lib/types.ts`
+### 5. Frontend Updates
+
+- **ExportPanel**: Wire `handleExport` to call `generate-export` edge function via `supabase.functions.invoke()`. Add polling/state for export job status.
+- **New hook `useExportJobs`**: Query `export_jobs` for project.
+- **New hook `useQuickNotes`**: Query `quick_notes` for project (for future UI).
+- **config.toml**: Add 3 new functions with `verify_jwt = false`.
+
+---
+
+### Files
+
+**Created (5):**
+1. `supabase/functions/calculate-project-state/index.ts`
+2. `supabase/functions/generate-export/index.ts`
+3. `supabase/functions/process-quick-note/index.ts`
+4. `src/hooks/useExportJobs.ts`
+5. `src/hooks/useQuickNotes.ts`
+
+**Edited (3):**
+6. `supabase/config.toml` — add 3 functions
+7. `src/features/plano/components/ExportPanel.tsx` — integrate with edge function
+8. SQL migration — create tables + RLS + bucket
 
