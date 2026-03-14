@@ -161,8 +161,7 @@ export function AppSidebar() {
               {isActive && (
                 <motion.div
                   layoutId="activeNav"
-                  className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
-                  style={{ backgroundColor: '#16a34a' }}
+                  className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
