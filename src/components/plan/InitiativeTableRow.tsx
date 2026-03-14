@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreHorizontal, Check, Play, Trash2, Loader2 } from 'lucide-react';
+import { MoreHorizontal, Check, Play, Trash2, Loader2, Eye } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
