@@ -81,30 +81,8 @@ export function useDashboardData(projectId: string | undefined) {
     return { steps, doneCount, currentIndex, pct };
   }, [assets, evidences, initiatives]);
 
-  // Activity feed — derive from real timestamps
-  const activityFeed = useMemo(() => {
-    const items: { type: 'upload' | 'ai' | 'validation' | 'alert'; text: string; time: Date }[] = [];
-
-    assets.forEach(a => {
-      items.push({ type: 'upload', text: `Arquivo "${a.file_name}" enviado ao Vault`, time: new Date(a.created_at) });
-    });
-
-    evidences.forEach(e => {
-      if (e.status === 'validado') {
-        items.push({ type: 'validation', text: `Gap "${e.content.slice(0, 50)}..." validado`, time: new Date(e.updated_at) });
-      } else if (e.is_divergence) {
-        items.push({ type: 'alert', text: `Divergência detectada: ${e.content.slice(0, 50)}...`, time: new Date(e.created_at) });
-      } else {
-        items.push({ type: 'ai', text: `Gap identificado: "${e.content.slice(0, 50)}..."`, time: new Date(e.created_at) });
-      }
-    });
-
-    initiatives.forEach(i => {
-      items.push({ type: 'ai', text: `Iniciativa "${i.title}" gerada no plano`, time: new Date(i.created_at) });
-    });
-
-    return items.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 8);
-  }, [assets, evidences, initiatives]);
+  // Activity feed from activity_log table
+  const activityFeed = activityLog;
 
   // Dominant DISC style
   const dominantStyle = useMemo(() => {
