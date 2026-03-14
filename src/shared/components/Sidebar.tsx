@@ -86,7 +86,7 @@ export function AppSidebar() {
                 currentProject ? 'bg-accent' : 'hover:bg-accent/50'
               )}
             >
-              <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: 'oklch(0.55 0.15 165 / 0.12)' }}>
+              <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 bg-primary-light">
                 <FolderOpen className="w-4 h-4 text-primary" />
               </div>
               <AnimatePresence>
