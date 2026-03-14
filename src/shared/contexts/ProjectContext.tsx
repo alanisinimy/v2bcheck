@@ -55,8 +55,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
       if (error) throw error;
-      return newProject as Project;
-    },
+      return newProject as unknown as Project;
     onSuccess: (newProject) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setCurrentProject(newProject);

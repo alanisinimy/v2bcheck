@@ -32,7 +32,7 @@ export function useProject(projectId: string | undefined) {
         .single();
       
       if (error) throw error;
-      return data as Project;
+      return data as unknown as Project;
     },
     enabled: !!projectId,
   });
