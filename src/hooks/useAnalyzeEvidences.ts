@@ -11,6 +11,9 @@ interface AnalyzeEvidencesParams {
   collaboratorId?: string;
 }
 
+// confidence_score added in Phase 2
+
+
 // New interface matching the edge function output
 interface ExtractedGap {
   gap: string;
@@ -18,8 +21,10 @@ interface ExtractedGap {
   benchmark: string;
   impacto: ImpactType;
   criticidade: CriticalityType;
+  confidence_score: number;
   is_divergence: boolean;
   divergence_description?: string;
+  return_reason?: string | null;
 }
 
 interface AnalyzeResult {
@@ -52,7 +57,7 @@ export async function analyzeEvidences({
     
     // Call the Edge Function with collaborator context
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
-      body: { content, collaboratorId }
+      body: { content, collaboratorId, projectId }
     });
 
     if (functionError) {
@@ -87,6 +92,8 @@ export async function analyzeEvidences({
       is_divergence: gap.is_divergence || false,
       divergence_description: gap.divergence_description || null,
       evidence_type: gap.is_divergence ? 'divergencia' as const : 'fato' as const,
+      confidence_score: gap.confidence_score ?? 1.0,
+      return_reason: gap.return_reason || null,
     }));
 
     const { error: insertError } = await supabase
@@ -195,7 +202,8 @@ export async function analyzeTechnicalNote({
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
       body: { 
         content, 
-        sourceType: 'observacao_consultor' 
+        sourceType: 'observacao_consultor',
+        projectId,
       }
     });
 

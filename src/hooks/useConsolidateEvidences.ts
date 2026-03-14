@@ -13,10 +13,23 @@ interface ConsolidationStats {
   evidences_archived: number;
 }
 
+export interface PilarCoverage {
+  pilar: string;
+  label: string;
+  peso: number;
+  peso_pct: number;
+  gaps_count: number;
+  validados_count: number;
+  cobertura_pct: number;
+  status: 'adequada' | 'parcial' | 'insuficiente';
+}
+
 interface ConsolidationResult {
   success: boolean;
   consolidations: ConsolidationGroup[];
   stats: ConsolidationStats;
+  cobertura_por_pilar: PilarCoverage[];
+  alertas: string[];
   error?: string;
 }
 
@@ -40,7 +53,6 @@ export function useConsolidateEvidences() {
       return data as ConsolidationResult;
     },
     onSuccess: (_, projectId) => {
-      // Invalidate evidences to refresh the matrix
       queryClient.invalidateQueries({ queryKey: ['evidences', projectId] });
     },
   });

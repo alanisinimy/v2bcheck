@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.analyze-people-data]
 verify_jwt = false
+
+[functions.ingest-evidence]
+verify_jwt = false
+
+[functions.validate-gaps]
+verify_jwt = false
