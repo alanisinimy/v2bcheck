@@ -1,77 +1,93 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Vendas2B Intelligence Design System - Apple Design Language with OKLCH */
+/* Vendas2B Intelligence Design System */
 
 @layer base {
   :root {
-    /* Border Radius - Apple style 16px */
-    --radius: 1rem;
+    /* Border Radius */
+    --radius: 0.75rem;
     
     /* Background & Foreground */
-    --background: 98.5% 0 0;
-    --foreground: 14.5% 0 0;
+    --background: 220 14% 96%;
+    --foreground: 220 20% 12%;
     
     /* Card */
-    --card: 100% 0 0;
-    --card-foreground: 14.5% 0 0;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 12%;
     
     /* Popover */
-    --popover: 100% 0 0;
-    --popover-foreground: 14.5% 0 0;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 12%;
     
-    /* Primary - Teal/Verde Vendas2B */
-    --primary: 55% 0.15 165;
-    --primary-foreground: 98% 0.02 165;
+    /* Primary - Green #16a34a */
+    --primary: 142 72% 36%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 142 64% 33%;
+    --primary-light: 138 76% 97%;
     
     /* Secondary */
-    --secondary: 96% 0.01 165;
-    --secondary-foreground: 30% 0.08 165;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 10% 40%;
     
     /* Muted */
-    --muted: 97% 0 0;
-    --muted-foreground: 45% 0 0;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
     
     /* Accent */
-    --accent: 95% 0.02 165;
-    --accent-foreground: 30% 0.1 165;
+    --accent: 138 76% 97%;
+    --accent-foreground: 142 64% 33%;
     
-    /* Destructive */
-    --destructive: 55% 0.2 25;
-    --destructive-foreground: 98% 0 0;
+    /* Destructive / Criticidade Alta - #ef4444 */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-light: 0 86% 97%;
     
-    /* Warning - Para status "Investigar" */
-    --warning: 75% 0.15 85;
-    --warning-foreground: 25% 0.1 85;
+    /* Warning / Criticidade Média - #f59e0b */
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 92% 20%;
+    --warning-light: 48 100% 96%;
     
-    /* Success - Para status "Validado" */
-    --success: 65% 0.18 145;
-    --success-foreground: 98% 0 0;
+    /* Success / Criticidade Baixa - #22c55e */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 138 76% 97%;
     
-    /* Border & Input */
-    --border: 92.2% 0 0;
-    --input: 92.2% 0 0;
-    --ring: 55% 0.15 165;
+    /* Info - #3b82f6 */
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+    --info-light: 214 95% 93%;
     
-    /* Sidebar - Glassmorphism */
-    --sidebar-background: 98% 0 0;
-    --sidebar-foreground: 26.1% 0.01 0;
-    --sidebar-primary: 55% 0.15 165;
-    --sidebar-primary-foreground: 98% 0 0;
-    --sidebar-accent: 95.9% 0.01 0;
-    --sidebar-accent-foreground: 10% 0.01 0;
-    --sidebar-border: 91% 0.01 0;
-    --sidebar-ring: 55% 0.15 165;
+    /* Border & Input — #e8eaed */
+    --border: 220 9% 91%;
+    --border-light: 220 10% 94%;
+    --input: 220 9% 91%;
+    --ring: 142 72% 36%;
+    
+    /* Text hierarchy */
+    --text-primary: 220 20% 12%;
+    --text-secondary: 220 8% 39%;
+    --text-tertiary: 218 10% 65%;
+    
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 20% 12%;
+    --sidebar-primary: 142 72% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 138 76% 97%;
+    --sidebar-accent-foreground: 220 20% 12%;
+    --sidebar-border: 220 9% 91%;
+    --sidebar-ring: 142 72% 36%;
     
     /* Pilares - Cores distintas */
-    --pilar-pessoas: 60% 0.15 340;
-    --pilar-processos: 60% 0.15 250;
-    --pilar-dados: 60% 0.15 165;
-    --pilar-tecnologia: 60% 0.15 290;
-    --pilar-gestao: 60% 0.15 45;
+    --pilar-pessoas: 330 65% 50%;
+    --pilar-processos: 220 70% 55%;
+    --pilar-dados: 142 72% 36%;
+    --pilar-tecnologia: 270 60% 55%;
+    --pilar-gestao: 30 80% 50%;
   }
 }
 
@@ -82,66 +98,70 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Apple-style smooth scrolling */
   html {
     scroll-behavior: smooth;
+  }
+
+  /* Headlines — tight tracking */
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
-  /* Apple-style active state for interactive elements */
+  /* Active press state */
   .active-scale {
     @apply transition-transform duration-150 active:scale-[0.98];
   }
   
-  /* Glassmorphism effect */
-  .glass {
-    background-color: oklch(var(--background) / 0.8);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid oklch(var(--border) / 0.5);
+  /* Mono label style */
+  .label-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
   
-  /* Soft shadows - Apple style */
+  /* Soft shadows */
   .shadow-soft {
-    box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.06),
-                0 4px 20px -4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04),
+                0 1px 2px -1px rgba(0, 0, 0, 0.06);
   }
   
   .shadow-soft-lg {
-    box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08),
-                0 8px 40px -8px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06),
+                0 10px 15px -3px rgba(0, 0, 0, 0.08);
   }
   
   /* Pilar badge backgrounds */
   .bg-pilar-pessoas {
-    background-color: oklch(var(--pilar-pessoas) / 0.15);
-    color: oklch(var(--pilar-pessoas));
+    background-color: hsl(var(--pilar-pessoas) / 0.12);
+    color: hsl(var(--pilar-pessoas));
   }
   
   .bg-pilar-processos {
-    background-color: oklch(var(--pilar-processos) / 0.15);
-    color: oklch(var(--pilar-processos));
+    background-color: hsl(var(--pilar-processos) / 0.12);
+    color: hsl(var(--pilar-processos));
   }
   
   .bg-pilar-dados {
-    background-color: oklch(var(--pilar-dados) / 0.15);
-    color: oklch(var(--pilar-dados));
+    background-color: hsl(var(--pilar-dados) / 0.12);
+    color: hsl(var(--pilar-dados));
   }
   
   .bg-pilar-tecnologia {
-    background-color: oklch(var(--pilar-tecnologia) / 0.15);
-    color: oklch(var(--pilar-tecnologia));
+    background-color: hsl(var(--pilar-tecnologia) / 0.12);
+    color: hsl(var(--pilar-tecnologia));
   }
   
   .bg-pilar-gestao {
-    background-color: oklch(var(--pilar-gestao) / 0.15);
-    color: oklch(var(--pilar-gestao));
+    background-color: hsl(var(--pilar-gestao) / 0.12);
+    color: hsl(var(--pilar-gestao));
   }
 }
