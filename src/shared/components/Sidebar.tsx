@@ -35,7 +35,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { currentProject, projects, setCurrentProject } = useProjectContext();
   const { user, signOut } = useAuth();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const nav = useNavigate();
 
   // Badges data
   const { data: assets = [] } = useAssets(currentProject?.id);
