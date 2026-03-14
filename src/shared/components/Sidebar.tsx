@@ -235,7 +235,7 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer — User + Collapse */}
-      <div className="px-3 py-3 border-t space-y-2" style={{ borderColor: '#e8eaed' }}>
+      <div className={cn('px-3 py-3 border-t border-sidebar-border space-y-2')}>
         {/* User Info */}
         <div className={cn('flex items-center gap-3 px-2', collapsed && 'justify-center px-0')}>
           <Avatar className="h-8 w-8 shrink-0">
