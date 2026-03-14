@@ -52,8 +52,7 @@ export function AppSidebar() {
       initial={false}
       animate={{ width: collapsed ? 72 : 240 }}
       transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-      className="h-screen flex flex-col sticky top-0 bg-white border-r shrink-0"
-      style={{ borderColor: '#e8eaed' }}
+      className="h-screen flex flex-col sticky top-0 bg-sidebar border-r border-sidebar-border shrink-0"
     >
       {/* Logo */}
       <div className="px-4 py-4 border-b" style={{ borderColor: '#e8eaed' }}>
