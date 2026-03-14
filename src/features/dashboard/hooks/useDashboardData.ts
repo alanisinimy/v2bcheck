@@ -12,6 +12,7 @@ export function useDashboardData(projectId: string | undefined) {
   const { data: evidences = [], isLoading: loadingEvidences } = useEvidences(projectId);
   const { data: collaborators = [], isLoading: loadingCollaborators } = useCollaborators(projectId);
   const { data: initiatives = [], isLoading: loadingInitiatives } = useInitiatives(projectId);
+  const { data: activityLog = [], isLoading: loadingActivity } = useActivityLog(projectId);
   const teamDistribution = useTeamDistribution(collaborators);
 
   const stats = useMemo(() => {
