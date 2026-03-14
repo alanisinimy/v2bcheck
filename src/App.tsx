@@ -13,6 +13,7 @@ import Team from "./pages/Team";
 import Plan from "./pages/Plan";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ProjetoSetupPage from "./features/projeto/components/ProjetoSetupPage";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="/matriz" element={<ProtectedRoute><Matriz /></ProtectedRoute>} />
               <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
               <Route path="/plan" element={<ProtectedRoute><Plan /></ProtectedRoute>} />
+              <Route path="/projeto/novo" element={<ProtectedRoute><ProjetoSetupPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

@@ -267,6 +267,41 @@ export type Database = {
           },
         ]
       }
+      project_invites: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          project_id: string
+          role: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          project_id: string
+          role?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          project_id?: string
+          role?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_invites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_members: {
         Row: {
           created_at: string | null
@@ -303,39 +338,48 @@ export type Database = {
         Row: {
           client_context: string | null
           client_name: string
+          company_size: string | null
           created_at: string
           created_by: string | null
+          custom_pilares: Json | null
           description: string | null
           id: string
           main_pain_points: string | null
           name: string
           project_goals: string | null
+          sector: string | null
           start_date: string
           updated_at: string
         }
         Insert: {
           client_context?: string | null
           client_name: string
+          company_size?: string | null
           created_at?: string
           created_by?: string | null
+          custom_pilares?: Json | null
           description?: string | null
           id?: string
           main_pain_points?: string | null
           name: string
           project_goals?: string | null
+          sector?: string | null
           start_date?: string
           updated_at?: string
         }
         Update: {
           client_context?: string | null
           client_name?: string
+          company_size?: string | null
           created_at?: string
           created_by?: string | null
+          custom_pilares?: Json | null
           description?: string | null
           id?: string
           main_pain_points?: string | null
           name?: string
           project_goals?: string | null
+          sector?: string | null
           start_date?: string
           updated_at?: string
         }

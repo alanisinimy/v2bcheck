@@ -9,6 +9,9 @@ interface CreateProjectData {
   name: string;
   client_name: string;
   description?: string;
+  sector?: string;
+  company_size?: string;
+  custom_pilares?: { id: string; label: string; icon: string }[];
 }
 
 interface ProjectContextType {
@@ -34,7 +37,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as Project[];
+      return data as unknown as Project[];
     },
   });
 
@@ -46,11 +49,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           name: data.name,
           client_name: data.client_name,
           description: data.description,
+          sector: data.sector,
+          company_size: data.company_size,
+          custom_pilares: data.custom_pilares as any,
         })
         .select()
         .single();
       if (error) throw error;
-      return newProject as Project;
+      return newProject as unknown as Project;
     },
     onSuccess: (newProject) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });

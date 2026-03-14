@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/utils';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useAssets, useEvidences } from '@/hooks/useProject';
-import { CreateProjectDialog } from '@/features/projeto/components/CreateProjectDialog';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -35,7 +35,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { currentProject, projects, setCurrentProject } = useProjectContext();
   const { user, signOut } = useAuth();
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const nav = useNavigate();
 
   // Badges data
   const { data: assets = [] } = useAssets(currentProject?.id);
@@ -129,7 +129,7 @@ export function AppSidebar() {
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => setDialogOpen(true)}
+              onClick={() => nav('/projeto/novo')}
               className="flex items-center gap-3 py-2.5 cursor-pointer text-primary"
             >
               <Plus className="w-4 h-4" />
@@ -137,7 +137,6 @@ export function AppSidebar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <CreateProjectDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       </div>
 
       {/* Main Navigation */}
