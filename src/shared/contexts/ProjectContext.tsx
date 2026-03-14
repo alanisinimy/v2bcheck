@@ -37,8 +37,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as Project[];
-    },
+      return data as unknown as Project[];
   });
 
   const createProjectMutation = useMutation({
