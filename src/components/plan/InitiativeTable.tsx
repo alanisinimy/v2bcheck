@@ -25,6 +25,7 @@ export function InitiativeTable({
   evidences,
   onUpdateStatus,
   onDelete,
+  onPreview,
   updatingId,
   deletingId,
 }: InitiativeTableProps) {
