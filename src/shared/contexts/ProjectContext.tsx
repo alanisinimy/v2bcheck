@@ -38,6 +38,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as unknown as Project[];
+    },
   });
 
   const createProjectMutation = useMutation({
@@ -56,6 +57,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .single();
       if (error) throw error;
       return newProject as unknown as Project;
+    },
     onSuccess: (newProject) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       setCurrentProject(newProject);
