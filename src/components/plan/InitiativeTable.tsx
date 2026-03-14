@@ -15,6 +15,7 @@ interface InitiativeTableProps {
   evidences: Evidence[];
   onUpdateStatus: (id: string, status: InitiativeStatus) => void;
   onDelete: (id: string) => void;
+  onPreview?: (id: string) => void;
   updatingId: string | null;
   deletingId: string | null;
 }

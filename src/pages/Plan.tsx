@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Loader2, FileText, Users, BarChart3 } from 'lucide-react';
+import { Sparkles, Loader2, FileText, Users, BarChart3, Eye } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
+import { PageHeader } from '@/shared/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { InitiativeTable } from '@/components/plan/InitiativeTable';
+import { PlanPreview } from '@/features/plano/components/PlanPreview';
+import { ExportPanel } from '@/features/plano/components/ExportPanel';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useProjectStats, useEvidences } from '@/hooks/useProject';
 import { useCollaborators, useTeamDistribution } from '@/hooks/useCollaborators';
@@ -23,28 +26,27 @@ export default function Plan() {
   const { data: collaborators = [] } = useCollaborators(currentProject?.id);
   const { data: initiatives = [], isLoading: isLoadingInitiatives } = useInitiatives(currentProject?.id);
   const { data: evidences = [] } = useEvidences(currentProject?.id);
-  
+
   const generateMutation = useGeneratePlan();
   const updateMutation = useUpdateInitiative();
   const deleteMutation = useDeleteInitiative();
-  
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [teamInsight, setTeamInsight] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFocusId, setPreviewFocusId] = useState<string | undefined>();
 
   const distribution = useTeamDistribution(collaborators);
   const validatedCount = stats.byStatus?.validado || 0;
-
-  // Filter only validated evidences for context
   const validatedEvidences = evidences.filter(e => e.status === 'validado');
+  const approvedCount = initiatives.filter(i => i.status !== 'draft').length;
 
   const handleGeneratePlan = async () => {
     if (!currentProject) return;
-    
     try {
       const result = await generateMutation.mutateAsync(currentProject.id);
       setTeamInsight(result.teamInsight);
-      
       toast({
         title: 'Plano gerado',
         description: `${result.initiatives.length} iniciativas estratégicas foram criadas.`,
@@ -60,26 +62,12 @@ export default function Plan() {
 
   const handleUpdateStatus = async (id: string, status: InitiativeStatus) => {
     if (!currentProject) return;
-    
     setUpdatingId(id);
-    
     try {
-      await updateMutation.mutateAsync({
-        id,
-        projectId: currentProject.id,
-        status,
-      });
-      
-      toast({
-        title: 'Status atualizado',
-        description: 'A iniciativa foi atualizada.',
-      });
+      await updateMutation.mutateAsync({ id, projectId: currentProject.id, status });
+      toast({ title: 'Status atualizado', description: 'A iniciativa foi atualizada.' });
     } catch (error: any) {
-      toast({
-        title: 'Erro ao atualizar',
-        description: error.message || 'Não foi possível atualizar a iniciativa.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' });
     } finally {
       setUpdatingId(null);
     }
@@ -87,28 +75,25 @@ export default function Plan() {
 
   const handleDelete = async (id: string) => {
     if (!currentProject) return;
-    
     setDeletingId(id);
-    
     try {
-      await deleteMutation.mutateAsync({
-        id,
-        projectId: currentProject.id,
-      });
-      
-      toast({
-        title: 'Iniciativa descartada',
-        description: 'A iniciativa foi removida do plano.',
-      });
+      await deleteMutation.mutateAsync({ id, projectId: currentProject.id });
+      toast({ title: 'Iniciativa descartada', description: 'A iniciativa foi removida do plano.' });
     } catch (error: any) {
-      toast({
-        title: 'Erro ao remover',
-        description: error.message || 'Não foi possível remover a iniciativa.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro ao remover', description: error.message, variant: 'destructive' });
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handlePreviewInitiative = (id: string) => {
+    setPreviewFocusId(id);
+    setPreviewOpen(true);
+  };
+
+  const handlePreviewFull = () => {
+    setPreviewFocusId(undefined);
+    setPreviewOpen(true);
   };
 
   const isLoading = isLoadingProject || isLoadingInitiatives;
@@ -131,58 +116,55 @@ export default function Plan() {
     );
   }
 
-  // Dominant style calculation
   const dominantStyle = Object.entries(distribution.percentages || {})
     .sort(([, a], [, b]) => b - a)[0];
   const dominantStyleName = dominantStyle?.[1] > 0 ? dominantStyle[0] : null;
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-6xl mx-auto">
-        {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
-        >
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
-              Plano Estratégico
-            </h1>
-            <p className="text-muted-foreground">
-              Iniciativas geradas pela IA cruzando gaps identificados e perfil do time
-            </p>
-          </div>
-          <Button
-            onClick={handleGeneratePlan}
-            disabled={generateMutation.isPending}
-            size="lg"
-          >
-            {generateMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Gerando...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Gerar Plano com IA
-              </>
-            )}
-          </Button>
-        </motion.header>
+      <div className="p-8 max-w-6xl mx-auto space-y-8">
+        <PageHeader
+          title="Plano Estratégico"
+          description="Iniciativas geradas pela IA cruzando gaps identificados e perfil do time"
+          actions={
+            <div className="flex items-center gap-2">
+              {initiatives.length > 0 && (
+                <Button variant="outline" onClick={handlePreviewFull}>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview Completo
+                </Button>
+              )}
+              <Button
+                onClick={handleGeneratePlan}
+                disabled={generateMutation.isPending}
+                size="lg"
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Gerar Plano com IA
+                  </>
+                )}
+              </Button>
+            </div>
+          }
+        />
 
         {/* Context Summary */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="glass rounded-xl p-6 border border-border/50 mb-8"
+          className="glass rounded-xl p-6 border border-border/50"
         >
           <h2 className="text-lg font-semibold text-foreground mb-4">
             Contexto Analisado
           </h2>
-          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -193,7 +175,6 @@ export default function Plan() {
                 <p className="text-xs text-muted-foreground">Gaps Validados</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Users className="w-5 h-5 text-primary" />
@@ -203,7 +184,6 @@ export default function Plan() {
                 <p className="text-xs text-muted-foreground">Colaboradores Mapeados</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <BarChart3 className="w-5 h-5 text-primary" />
@@ -237,7 +217,7 @@ export default function Plan() {
               Nenhuma iniciativa gerada ainda
             </h3>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              Clique em "Gerar Plano com IA" para criar iniciativas estratégicas 
+              Clique em "Gerar Plano com IA" para criar iniciativas estratégicas
               baseadas nos gaps validados e no perfil do seu time.
             </p>
             {validatedCount === 0 && (
@@ -256,17 +236,35 @@ export default function Plan() {
             <h2 className="text-lg font-semibold text-foreground">
               Iniciativas Estratégicas ({initiatives.length})
             </h2>
-            
             <InitiativeTable
               initiatives={initiatives}
               evidences={validatedEvidences}
               onUpdateStatus={handleUpdateStatus}
               onDelete={handleDelete}
+              onPreview={handlePreviewInitiative}
               updatingId={updatingId}
               deletingId={deletingId}
             />
           </motion.div>
         )}
+
+        {/* Export Panel */}
+        <ExportPanel
+          validatedGapsCount={validatedCount}
+          approvedInitiativesCount={approvedCount}
+          hasInitiatives={initiatives.length > 0}
+        />
+
+        {/* Preview Modal */}
+        <PlanPreview
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          initiatives={initiatives}
+          evidences={evidences}
+          projectName={currentProject.name}
+          clientName={currentProject.client_name}
+          focusInitiativeId={previewFocusId}
+        />
       </div>
     </AppLayout>
   );
