@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/utils';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useAssets, useEvidences } from '@/hooks/useProject';
-import { CreateProjectDialog } from '@/features/projeto/components/CreateProjectDialog';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
