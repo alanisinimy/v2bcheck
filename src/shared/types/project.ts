@@ -11,7 +11,7 @@ export interface Project {
   project_goals?: string;
   sector?: string;
   company_size?: string;
-  custom_pilares?: { id: string; label: string; icon: string }[] | null;
+  custom_pilares?: any;
   created_at: string;
   updated_at: string;
 }
