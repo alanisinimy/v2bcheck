@@ -14,16 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action: string
+          actor_name: string | null
+          actor_type: string
+          created_at: string | null
+          description: string
+          id: string
+          metadata: Json | null
+          project_id: string
+        }
+        Insert: {
+          action: string
+          actor_name?: string | null
+          actor_type: string
+          created_at?: string | null
+          description: string
+          id?: string
+          metadata?: Json | null
+          project_id: string
+        }
+        Update: {
+          action?: string
+          actor_name?: string | null
+          actor_type?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          metadata?: Json | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
+          chunks: Json | null
           collaborator_id: string | null
           created_at: string
           duration_seconds: number | null
+          extracted_text: string | null
           file_name: string
           file_size: number
           file_type: string
           id: string
           metadata: Json | null
+          pilar_classificado: string | null
+          processing_status: string | null
           project_id: string
           source_type: Database["public"]["Enums"]["source_type"] | null
           status: Database["public"]["Enums"]["asset_status"]
@@ -31,14 +76,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          chunks?: Json | null
           collaborator_id?: string | null
           created_at?: string
           duration_seconds?: number | null
+          extracted_text?: string | null
           file_name: string
           file_size: number
           file_type: string
           id?: string
           metadata?: Json | null
+          pilar_classificado?: string | null
+          processing_status?: string | null
           project_id: string
           source_type?: Database["public"]["Enums"]["source_type"] | null
           status?: Database["public"]["Enums"]["asset_status"]
@@ -46,14 +95,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          chunks?: Json | null
           collaborator_id?: string | null
           created_at?: string
           duration_seconds?: number | null
+          extracted_text?: string | null
           file_name?: string
           file_size?: number
           file_type?: string
           id?: string
           metadata?: Json | null
+          pilar_classificado?: string | null
+          processing_status?: string | null
           project_id?: string
           source_type?: Database["public"]["Enums"]["source_type"] | null
           status?: Database["public"]["Enums"]["asset_status"]
@@ -131,6 +184,7 @@ export type Database = {
         Row: {
           asset_id: string | null
           benchmark: string | null
+          confidence_score: number | null
           content: string
           created_at: string
           criticality: string | null
@@ -142,7 +196,9 @@ export type Database = {
           notes: string | null
           pilar: Database["public"]["Enums"]["pilar"]
           project_id: string
+          return_reason: string | null
           sequential_id: number | null
+          source_chunks: Json | null
           source_description: string | null
           status: Database["public"]["Enums"]["evidence_status"]
           timecode_end: number | null
@@ -152,6 +208,7 @@ export type Database = {
         Insert: {
           asset_id?: string | null
           benchmark?: string | null
+          confidence_score?: number | null
           content: string
           created_at?: string
           criticality?: string | null
@@ -163,7 +220,9 @@ export type Database = {
           notes?: string | null
           pilar: Database["public"]["Enums"]["pilar"]
           project_id: string
+          return_reason?: string | null
           sequential_id?: number | null
+          source_chunks?: Json | null
           source_description?: string | null
           status?: Database["public"]["Enums"]["evidence_status"]
           timecode_end?: number | null
@@ -173,6 +232,7 @@ export type Database = {
         Update: {
           asset_id?: string | null
           benchmark?: string | null
+          confidence_score?: number | null
           content?: string
           created_at?: string
           criticality?: string | null
@@ -184,7 +244,9 @@ export type Database = {
           notes?: string | null
           pilar?: Database["public"]["Enums"]["pilar"]
           project_id?: string
+          return_reason?: string | null
           sequential_id?: number | null
+          source_chunks?: Json | null
           source_description?: string | null
           status?: Database["public"]["Enums"]["evidence_status"]
           timecode_end?: number | null
@@ -267,6 +329,53 @@ export type Database = {
           },
         ]
       }
+      processing_queue: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          file_id: string
+          id: string
+          progress_pct: number | null
+          project_id: string
+          started_at: string | null
+          status: string
+          step_atual: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_id: string
+          id?: string
+          progress_pct?: number | null
+          project_id: string
+          started_at?: string | null
+          status?: string
+          step_atual?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          file_id?: string
+          id?: string
+          progress_pct?: number | null
+          project_id?: string
+          started_at?: string | null
+          status?: string
+          step_atual?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_queue_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_invites: {
         Row: {
           created_at: string
@@ -334,6 +443,33 @@ export type Database = {
           },
         ]
       }
+      project_templates: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          nome: string
+          pilares: Json
+          setor: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          nome: string
+          pilares: Json
+          setor: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          nome?: string
+          pilares?: Json
+          setor?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           client_context: string | null
@@ -341,14 +477,17 @@ export type Database = {
           company_size: string | null
           created_at: string
           created_by: string | null
+          current_phase: string | null
           custom_pilares: Json | null
           description: string | null
           id: string
           main_pain_points: string | null
           name: string
+          pilares_config: Json | null
           project_goals: string | null
           sector: string | null
           start_date: string
+          template_id: string | null
           updated_at: string
         }
         Insert: {
@@ -357,14 +496,17 @@ export type Database = {
           company_size?: string | null
           created_at?: string
           created_by?: string | null
+          current_phase?: string | null
           custom_pilares?: Json | null
           description?: string | null
           id?: string
           main_pain_points?: string | null
           name: string
+          pilares_config?: Json | null
           project_goals?: string | null
           sector?: string | null
           start_date?: string
+          template_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -373,17 +515,28 @@ export type Database = {
           company_size?: string | null
           created_at?: string
           created_by?: string | null
+          current_phase?: string | null
           custom_pilares?: Json | null
           description?: string | null
           id?: string
           main_pain_points?: string | null
           name?: string
+          pilares_config?: Json | null
           project_goals?: string | null
           sector?: string | null
           start_date?: string
+          template_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "projects_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "project_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
