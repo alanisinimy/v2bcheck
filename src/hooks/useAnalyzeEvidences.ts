@@ -21,8 +21,10 @@ interface ExtractedGap {
   benchmark: string;
   impacto: ImpactType;
   criticidade: CriticalityType;
+  confidence_score: number;
   is_divergence: boolean;
   divergence_description?: string;
+  return_reason?: string | null;
 }
 
 interface AnalyzeResult {
