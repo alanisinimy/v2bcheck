@@ -53,6 +53,7 @@ export function InitiativeTableRow({
   evidenceMap,
   onUpdateStatus,
   onDelete,
+  onPreview,
   isUpdating = false,
   isDeleting = false,
 }: InitiativeTableRowProps) {
