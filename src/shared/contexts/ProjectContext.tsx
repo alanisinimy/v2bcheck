@@ -49,6 +49,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           name: data.name,
           client_name: data.client_name,
           description: data.description,
+          sector: data.sector,
+          company_size: data.company_size,
+          custom_pilares: data.custom_pilares as any,
         })
         .select()
         .single();

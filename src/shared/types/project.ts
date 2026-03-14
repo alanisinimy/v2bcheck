@@ -9,6 +9,9 @@ export interface Project {
   client_context?: string;
   main_pain_points?: string;
   project_goals?: string;
+  sector?: string;
+  company_size?: string;
+  custom_pilares?: { id: string; label: string; icon: string }[] | null;
   created_at: string;
   updated_at: string;
 }
