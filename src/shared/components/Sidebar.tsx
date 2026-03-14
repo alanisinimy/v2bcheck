@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FolderOpen, Plus, ChevronLeft, ChevronRight, Settings, Users as UsersIcon, LogOut } from 'lucide-react';
+import { ChevronDown, Check, FolderOpen, Plus, ChevronLeft, ChevronRight, Settings, Users as UsersIcon, LogOut, Sun, Moon } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { useTheme } from '@/shared/hooks/useTheme';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useAssets, useEvidences } from '@/hooks/useProject';
