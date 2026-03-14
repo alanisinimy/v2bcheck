@@ -36,6 +36,7 @@ interface InitiativeTableRowProps {
   evidenceMap: Map<string, Evidence>;
   onUpdateStatus: (id: string, status: InitiativeStatus) => void;
   onDelete: (id: string) => void;
+  onPreview?: (id: string) => void;
   isUpdating?: boolean;
   isDeleting?: boolean;
 }
