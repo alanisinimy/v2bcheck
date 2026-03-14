@@ -29,7 +29,7 @@ export function PilaresTab() {
     try {
       await updateProject.mutateAsync({
         projectId: currentProject.id,
-        updates: { custom_pilares: pilares as any },
+        custom_pilares: pilares as any,
       });
       toast.success('Pilares atualizados com sucesso');
     } catch {
