@@ -1,32 +1,26 @@
 import { motion } from 'framer-motion';
-import { Calendar, FileText, CheckCircle, Clock, AlertTriangle, BarChart3, Info } from 'lucide-react';
+import { FileDown, Sparkles } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { EmptyProjectState } from '@/components/layout/EmptyProjectState';
-import { MetricCard } from '@/components/dashboard/MetricCard';
-import { StatsCard } from '@/components/dashboard/StatsCard';
-import { ProjectOverviewForm } from '@/components/dashboard/ProjectOverviewForm';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/shared/components/PageHeader';
+import { Button } from '@/components/ui/button';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
-import { useProjectStats, useEvidences } from '@/hooks/useProject';
-import type { Pilar } from '@/lib/types';
-import { PILARES } from '@/lib/types';
+import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData';
+import { ProjectStepper } from '@/features/dashboard/components/ProjectStepper';
+import { StatsGrid } from '@/features/dashboard/components/StatsGrid';
+import { PillarCoverage } from '@/features/dashboard/components/PillarCoverage';
+import { RecentGaps } from '@/features/dashboard/components/RecentGaps';
+import { NextStepCTA } from '@/features/dashboard/components/NextStepCTA';
+import { ActivityFeed } from '@/features/dashboard/components/ActivityFeed';
 
 export default function Dashboard() {
-  const { currentProject, isLoading } = useProjectContext();
-  
-  // Dados reais do Supabase
-  const stats = useProjectStats(currentProject?.id);
-  const { data: evidences } = useEvidences(currentProject?.id);
+  const { currentProject, isLoading: projectLoading } = useProjectContext();
+  const {
+    stats, pillarCoverage, recentGaps, stepperState,
+    activityFeed, dominantStyle, nextStep, isLoading: dataLoading,
+  } = useDashboardData(currentProject?.id);
 
-  // Filtrar divergências reais (is_divergence=true ou evidence_type='divergencia')
-  const recentDivergences = evidences
-    ?.filter(ev => ev.is_divergence || ev.evidence_type === 'divergencia')
-    .slice(0, 5) || [];
-
-  const pilares: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
-
-  // Show loading state
-  if (isLoading) {
+  if (projectLoading) {
     return (
       <AppLayout>
         <div className="flex-1 flex items-center justify-center">
@@ -36,7 +30,6 @@ export default function Dashboard() {
     );
   }
 
-  // Show empty state if no project selected
   if (!currentProject) {
     return (
       <AppLayout>
@@ -47,128 +40,56 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="p-8 max-w-7xl mx-auto">
-        {/* Header */}
-        <motion.header
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-          className="mb-6"
-        >
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            {currentProject.client_name}
-          </h1>
-          <div className="flex items-center gap-4 text-muted-foreground">
-            <span className="font-medium text-foreground">{currentProject.name}</span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4" />
-              Início: {new Date(currentProject.start_date).toLocaleDateString('pt-BR')}
-            </span>
-          </div>
-        </motion.header>
+      <div className="p-8 max-w-7xl mx-auto space-y-6">
+        {/* 3.1 PageHeader */}
+        <PageHeader
+          title="Dashboard do Projeto"
+          description={`${currentProject.name} · ${currentProject.client_name} — visão geral e próximos passos`}
+          actions={
+            <>
+              <Button variant="outline" size="sm" className="gap-2">
+                <FileDown className="w-4 h-4" />
+                Exportar Relatório
+              </Button>
+              <Button size="sm" className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                <Sparkles className="w-4 h-4" />
+                Gerar Diagnóstico com IA
+              </Button>
+            </>
+          }
+        />
 
-        {/* Tabs */}
-        <Tabs defaultValue="metricas" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger value="metricas" className="gap-2 data-[state=active]:bg-background">
-              <BarChart3 className="w-4 h-4" />
-              Métricas
-            </TabsTrigger>
-            <TabsTrigger value="visao-geral" className="gap-2 data-[state=active]:bg-background">
-              <Info className="w-4 h-4" />
-              Visão Geral
-            </TabsTrigger>
-          </TabsList>
+        {/* 3.2 ProjectStepper */}
+        <ProjectStepper
+          steps={stepperState.steps}
+          currentIndex={stepperState.currentIndex}
+          pct={stepperState.pct}
+        />
 
-          {/* Metrics Tab */}
-          <TabsContent value="metricas" className="space-y-6">
-            {/* Stats Row */}
-            <div className="grid grid-cols-4 gap-4">
-              <StatsCard
-                title="Total de Evidências"
-                value={stats.total}
-                icon={FileText}
-                index={0}
-              />
-              <StatsCard
-                title="Validadas"
-                value={stats.byStatus?.validado || 0}
-                icon={CheckCircle}
-                variant="success"
-                index={1}
-              />
-              <StatsCard
-                title="Pendentes"
-                value={stats.byStatus?.pendente || 0}
-                icon={Clock}
-                index={2}
-              />
-              <StatsCard
-                title="Divergências"
-                value={stats.divergences}
-                icon={AlertTriangle}
-                variant="warning"
-                index={3}
-              />
-            </div>
+        {/* 3.3 StatsGrid */}
+        <StatsGrid
+          totalAssets={stats.totalAssets}
+          pdfs={stats.pdfs}
+          entrevistas={stats.entrevistas}
+          totalEvidences={stats.totalEvidences}
+          validados={stats.validados}
+          pendentes={stats.pendentes}
+          criticalidadeAlta={stats.criticalidadeAlta}
+          totalCollaborators={stats.totalCollaborators}
+          dominantStyle={dominantStyle}
+        />
 
-            {/* Pilares Grid */}
-            <motion.h2
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-xl font-semibold text-foreground"
-            >
-              Saturação por Pilar
-            </motion.h2>
-            
-            <div className="grid grid-cols-5 gap-4">
-              {pilares.map((pilar, index) => (
-                <MetricCard
-                  key={pilar}
-                  pilar={pilar}
-                  count={stats.byPilar?.[pilar] || 0}
-                  total={stats.total}
-                  index={index}
-                />
-              ))}
-            </div>
+        {/* 3.4 Two columns: PillarCoverage + RecentGaps */}
+        <div className="grid grid-cols-2 gap-4">
+          <PillarCoverage items={pillarCoverage} />
+          <RecentGaps gaps={recentGaps} totalGaps={stats.totalEvidences} />
+        </div>
 
-            {/* Insights Section */}
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
-              className="bg-card rounded-2xl p-6 border border-border/50 shadow-soft"
-            >
-              <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-warning" />
-                Divergências Detectadas
-              </h2>
-              <div className="space-y-3">
-                {recentDivergences.length === 0 ? (
-                  <p className="text-muted-foreground text-sm py-4 text-center">
-                    Nenhuma divergência detectada ainda.
-                  </p>
-                ) : (
-                  recentDivergences.map((div) => (
-                    <div key={div.id} className="p-4 rounded-xl bg-warning/5 border border-warning/20">
-                      <p className="text-foreground">
-                        <span className="font-medium capitalize">{div.pilar}:</span>{' '}
-                        {div.divergence_description || div.content}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </motion.section>
-          </TabsContent>
+        {/* 3.5 NextStepCTA */}
+        <NextStepCTA {...nextStep} />
 
-          {/* Overview Tab */}
-          <TabsContent value="visao-geral">
-            <ProjectOverviewForm project={currentProject} />
-          </TabsContent>
-        </Tabs>
+        {/* 3.6 ActivityFeed */}
+        <ActivityFeed items={activityFeed} />
       </div>
     </AppLayout>
   );
