@@ -57,7 +57,7 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ backgroundColor: '#16a34a' }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0 bg-primary">
             V2
           </div>
           <AnimatePresence>
