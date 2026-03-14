@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Check, FolderOpen, Plus, ChevronLeft, ChevronRight, Settings, Users as UsersIcon, LogOut } from 'lucide-react';
+import { ChevronDown, Check, FolderOpen, Plus, ChevronLeft, ChevronRight, Settings, Users as UsersIcon, LogOut, Sun, Moon } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
+import { useTheme } from '@/shared/hooks/useTheme';
 import { useProjectContext } from '@/shared/contexts/ProjectContext';
 import { useAuth } from '@/shared/contexts/AuthContext';
 import { useAssets, useEvidences } from '@/hooks/useProject';
@@ -35,6 +36,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { currentProject, projects, setCurrentProject } = useProjectContext();
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const nav = useNavigate();
 
   // Badges data
@@ -50,13 +52,12 @@ export function AppSidebar() {
       initial={false}
       animate={{ width: collapsed ? 72 : 240 }}
       transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-      className="h-screen flex flex-col sticky top-0 bg-white border-r shrink-0"
-      style={{ borderColor: '#e8eaed' }}
+      className="h-screen flex flex-col sticky top-0 bg-sidebar border-r border-sidebar-border shrink-0"
     >
       {/* Logo */}
-      <div className="px-4 py-4 border-b" style={{ borderColor: '#e8eaed' }}>
+      <div className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0" style={{ backgroundColor: '#16a34a' }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0 bg-primary">
             V2
           </div>
           <AnimatePresence>
@@ -77,7 +78,7 @@ export function AppSidebar() {
       </div>
 
       {/* Project Switcher */}
-      <div className="px-3 py-3 border-b" style={{ borderColor: '#e8eaed' }}>
+      <div className="px-3 py-3 border-b border-sidebar-border">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -160,8 +161,7 @@ export function AppSidebar() {
               {isActive && (
                 <motion.div
                   layoutId="activeNav"
-                  className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full"
-                  style={{ backgroundColor: '#16a34a' }}
+                  className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary"
                   transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                 />
               )}
@@ -235,7 +235,7 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer — User + Collapse */}
-      <div className="px-3 py-3 border-t space-y-2" style={{ borderColor: '#e8eaed' }}>
+      <div className={cn('px-3 py-3 border-t border-sidebar-border space-y-2')}>
         {/* User Info */}
         <div className={cn('flex items-center gap-3 px-2', collapsed && 'justify-center px-0')}>
           <Avatar className="h-8 w-8 shrink-0">
@@ -266,20 +266,23 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors active-scale"
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-              <span className="text-xs font-medium">Recolher</span>
-            </>
-          )}
-        </button>
+        {/* Theme + Collapse */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleTheme}
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors active-scale"
+            title={theme === 'light' ? 'Modo escuro' : 'Modo claro'}
+          >
+            {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            {!collapsed && <span className="text-xs font-medium">{theme === 'light' ? 'Escuro' : 'Claro'}</span>}
+          </button>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors active-scale"
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
     </motion.aside>
   );
