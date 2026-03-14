@@ -70,6 +70,7 @@ export function InitiativeTable({
                   evidenceMap={evidenceMap}
                   onUpdateStatus={onUpdateStatus}
                   onDelete={onDelete}
+                  onPreview={onPreview}
                   isUpdating={updatingId === initiative.id}
                   isDeleting={deletingId === initiative.id}
                 />
