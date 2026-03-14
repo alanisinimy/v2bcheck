@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useAssets, useEvidences } from '@/hooks/useProject';
 import { useCollaborators, useTeamDistribution } from '@/hooks/useCollaborators';
 import { useInitiatives } from '@/hooks/useInitiatives';
+import { useActivityLog } from '@/features/dashboard/hooks/useActivityLog';
 import type { Pilar } from '@/shared/types/project';
-import type { Evidence } from '@/shared/types/gap';
 
 const ALL_PILARES: Pilar[] = ['pessoas', 'processos', 'dados', 'tecnologia', 'gestao'];
 
