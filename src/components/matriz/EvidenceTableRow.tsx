@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { PILARES, IMPACT_CONFIG, CRITICALITY_CONFIG, STATUS_CONFIG } from '@/lib/types';
 import type { Evidence, EvidenceStatus } from '@/lib/types';
+import { Link } from 'react-router-dom';
 
 interface EvidenceTableRowProps {
   evidence: Evidence;
@@ -58,6 +59,11 @@ export function EvidenceTableRow({
     }
   };
 
+  // 5.4 — Weakness indicators
+  const isRejected = evidence.status === 'rejeitado';
+  const isInvestigate = evidence.status === 'investigar';
+  const showWeaknessTag = isRejected || isInvestigate;
+
   return (
     <>
       <TableRow className="group">
@@ -76,6 +82,27 @@ export function EvidenceTableRow({
         {/* Gap Identificado */}
         <TableCell className="max-w-[300px]">
           <p className="text-sm line-clamp-2">{evidence.content}</p>
+          {/* Weakness tags */}
+          {showWeaknessTag && (
+            <div className="flex items-center gap-2 mt-1.5">
+              {isRejected && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                  Rejeitado pelo consultor
+                </span>
+              )}
+              {isInvestigate && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning font-medium">
+                  Confiança baixa
+                </span>
+              )}
+              <Link
+                to={`/vault`}
+                className="text-[10px] text-primary hover:underline font-medium"
+              >
+                ↩ Coletar mais evidência
+              </Link>
+            </div>
+          )}
         </TableCell>
 
         {/* Benchmark */}
