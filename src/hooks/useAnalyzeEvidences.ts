@@ -55,7 +55,7 @@ export async function analyzeEvidences({
     
     // Call the Edge Function with collaborator context
     const { data, error: functionError } = await supabase.functions.invoke('analyze-evidences', {
-      body: { content, collaboratorId }
+      body: { content, collaboratorId, projectId }
     });
 
     if (functionError) {
