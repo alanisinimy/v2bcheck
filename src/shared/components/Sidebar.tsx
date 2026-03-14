@@ -78,7 +78,7 @@ export function AppSidebar() {
       </div>
 
       {/* Project Switcher */}
-      <div className="px-3 py-3 border-b" style={{ borderColor: '#e8eaed' }}>
+      <div className="px-3 py-3 border-b border-sidebar-border">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
