@@ -11,6 +11,9 @@ interface AnalyzeEvidencesParams {
   collaboratorId?: string;
 }
 
+// confidence_score added in Phase 2
+
+
 // New interface matching the edge function output
 interface ExtractedGap {
   gap: string;
